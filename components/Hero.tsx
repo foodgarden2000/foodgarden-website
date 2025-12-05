@@ -1,0 +1,88 @@
+import React from 'react';
+import { ChevronRight, ArrowDown } from 'lucide-react';
+import { RESTAURANT_INFO } from '../constants';
+
+const Hero: React.FC = () => {
+  const handleScroll = (e: React.MouseEvent<HTMLAnchorElement>, href: string) => {
+    e.preventDefault();
+    const targetId = href.replace('#', '');
+    const element = document.getElementById(targetId);
+    
+    if (element) {
+      const headerOffset = 90; 
+      const elementPosition = element.getBoundingClientRect().top;
+      const offsetPosition = elementPosition + window.scrollY - headerOffset;
+  
+      window.scrollTo({
+        top: offsetPosition,
+        behavior: "smooth"
+      });
+    }
+  };
+
+  return (
+    <section id="hero" className="relative h-screen flex items-center justify-center overflow-hidden">
+      {/* Background Image with Overlay */}
+      <div className="absolute inset-0 z-0">
+        <img 
+          src="https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?ixlib=rb-1.2.1&auto=format&fit=crop&w=1920&q=80" 
+          alt="Fine Dining Ambiance" 
+          className="w-full h-full object-cover animate-pulse-slow"
+        />
+        <div className="absolute inset-0 bg-gradient-to-t from-brand-black via-brand-black/70 to-brand-black/30"></div>
+        {/* Pattern Overlay */}
+        <div className="absolute inset-0 opacity-10 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')]"></div>
+      </div>
+
+      {/* Content */}
+      <div className="relative z-10 text-center px-4 max-w-5xl mx-auto flex flex-col items-center">
+        <div className="mb-6 animate-fade-in-up">
+           <span className="inline-block h-px w-12 bg-brand-gold mb-2"></span>
+           <h2 className="text-brand-gold font-sans text-sm md:text-base tracking-[0.3em] uppercase font-semibold">
+             Welcome to {RESTAURANT_INFO.address.split(',')[2]}
+           </h2>
+           <span className="inline-block h-px w-12 bg-brand-gold mt-2"></span>
+        </div>
+        
+        <h1 className="text-6xl md:text-8xl lg:text-9xl font-display font-bold text-white mb-6 leading-none text-shadow-gold animate-fade-in-up opacity-0" style={{ animationDelay: '0.2s', animationFillMode: 'forwards' }}>
+          {RESTAURANT_INFO.name}
+        </h1>
+        
+        <p className="text-gray-300 text-lg md:text-2xl max-w-3xl mx-auto mb-12 font-serif italic tracking-wide animate-fade-in-up opacity-0" style={{ animationDelay: '0.4s', animationFillMode: 'forwards' }}>
+          "{RESTAURANT_INFO.tagline}" <br/>
+          <span className="text-brand-goldLight text-base md:text-lg not-italic mt-2 block font-sans font-light opacity-90">
+             Indian • Chinese • Continental • Festive Dining
+          </span>
+        </p>
+        
+        <div className="flex flex-col sm:flex-row justify-center gap-6 animate-fade-in-up opacity-0" style={{ animationDelay: '0.6s', animationFillMode: 'forwards' }}>
+          <a 
+            href="#reservation"
+            onClick={(e) => handleScroll(e, '#reservation')}
+            className="px-10 py-4 bg-brand-gold text-brand-black font-bold text-sm uppercase tracking-widest hover:bg-white transition-all duration-300 rounded-sm shadow-[0_0_20px_rgba(212,175,55,0.3)] hover:shadow-[0_0_30px_rgba(212,175,55,0.6)] transform hover:-translate-y-1"
+          >
+            Reserve a Table
+          </a>
+          <a 
+            href={`tel:${RESTAURANT_INFO.phone}`}
+            className="px-10 py-4 border border-white/30 backdrop-blur-sm text-white font-bold text-sm uppercase tracking-widest hover:border-brand-gold hover:text-brand-gold transition-all duration-300 rounded-sm shadow-lg flex items-center justify-center group"
+          >
+            Call Now <ChevronRight className="ml-2 w-4 h-4 group-hover:translate-x-1 transition-transform" />
+          </a>
+        </div>
+      </div>
+
+      {/* Scroll indicator */}
+      <div className="absolute bottom-10 left-1/2 transform -translate-x-1/2 animate-bounce cursor-pointer opacity-70 hover:opacity-100 transition-opacity">
+        <a href="#about" onClick={(e) => handleScroll(e, '#about')} className="flex flex-col items-center">
+            <span className="text-[10px] text-brand-gold uppercase tracking-widest mb-2">Explore</span>
+            <div className="w-6 h-10 border border-brand-gold/50 rounded-full flex justify-center pt-2">
+                <div className="w-1 h-2 bg-brand-gold rounded-full animate-pulse"></div>
+            </div>
+        </a>
+      </div>
+    </section>
+  );
+};
+
+export default Hero;

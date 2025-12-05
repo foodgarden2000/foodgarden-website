@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Chef's Jalsa - Test Your Taste | Jhumri Telaiya</title>
+    <meta name="description" content="Best family restaurant in Jhumri Telaiya, Koderma. Chef's Jalsa offers Indian, Chinese, Continental cuisine and festive dining. Book your table now!" />
+    <meta name="keywords" content="Restaurant in Jhumri Telaiya, Best family restaurant Koderma, Festival dining Jharkhand, Chinese and Indian food Jhumri Telaiya, Chef's Jalsa menu" />
+    
+    <!-- Google Fonts: Cormorant Garamond (Headings), Montserrat (Body), Cinzel (Logo) -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;0,700;1,400&family=Montserrat:wght@300;400;500;600&display=swap" rel="stylesheet">
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            colors: {
+              brand: {
+                gold: '#D4AF37', // Premium Gold
+                goldLight: '#F3E5AB', // Light Gold/Champagne
+                dark: '#121212', // Deep Dark Grey
+                black: '#050505', // Rich Black
+                cream: '#F5F5F0', // Off-white/Cream
+                red: '#800020', // Burgundy accent
+              }
+            },
+            fontFamily: {
+              serif: ['"Cormorant Garamond"', 'serif'],
+              sans: ['"Montserrat"', 'sans-serif'],
+              display: ['"Cinzel"', 'serif'],
+            },
+            backgroundImage: {
+              'gradient-radial': 'radial-gradient(var(--tw-gradient-stops))',
+              'gold-gradient': 'linear-gradient(135deg, #D4AF37 0%, #F3E5AB 50%, #D4AF37 100%)',
+            }
+          }
+        }
+      }
+    </script>
+    <style>
+      html { 
+        scroll-behavior: smooth; 
+        scroll-padding-top: 90px; /* Offset for fixed navbar */
+      }
+      body {
+        background-color: #F5F5F0;
+        color: #121212;
+      }
+      .text-shadow { text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.7); }
+      .text-shadow-gold { text-shadow: 0px 0px 10px rgba(212, 175, 55, 0.3); }
+      
+      /* Glassmorphism utilities */
+      .glass {
+        background: rgba(18, 18, 18, 0.7);
+        backdrop-filter: blur(12px);
+        -webkit-backdrop-filter: blur(12px);
+        border-bottom: 1px solid rgba(212, 175, 55, 0.1);
+      }
+      
+      .glass-card {
+        background: rgba(255, 255, 255, 0.03);
+        backdrop-filter: blur(10px);
+        border: 1px solid rgba(255, 255, 255, 0.05);
+      }
+
+      /* Custom Animations */
+      @keyframes fadeInUp {
+        from { opacity: 0; transform: translateY(20px); }
+        to { opacity: 1; transform: translateY(0); }
+      }
+      .animate-fade-in-up {
+        animation: fadeInUp 0.8s ease-out forwards;
+      }
+      
+      @keyframes float {
+        0% { transform: translateY(0px); }
+        50% { transform: translateY(-10px); }
+        100% { transform: translateY(0px); }
+      }
+      .animate-float {
+        animation: float 4s ease-in-out infinite;
+      }
+    </style>
+  <script type="importmap">
+{
+  "imports": {
+    "react": "https://aistudiocdn.com/react@^19.2.0",
+    "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.0/",
+    "react/": "https://aistudiocdn.com/react@^19.2.0/",
+    "lucide-react": "https://aistudiocdn.com/lucide-react@^0.554.0"
+  }
+}
+</script>
+</head>
+  <body class="font-sans antialiased overflow-x-hidden selection:bg-brand-gold selection:text-brand-black">
+    <div id="root"></div>
+  </body>
+</html>
