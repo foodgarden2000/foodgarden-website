@@ -9,11 +9,11 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "vite": "^7.2.6",
-    "@vitejs/plugin-react": "^5.1.1",
-    "lucide-react": "^0.556.0",
-    "react": "^19.2.1",
-    "react-dom": "^19.2.1"
+    "lucide-react": "^0.561.0",
+    "react-dom": "^19.2.3",
+    "react": "^19.2.3",
+    "@vitejs/plugin-react": "^5.1.2",
+    "vite": "^7.2.7"
   },
   "devDependencies": {
     "@types/node": "^22.14.0",
