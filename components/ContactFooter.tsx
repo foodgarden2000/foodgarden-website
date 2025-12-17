@@ -11,6 +11,9 @@ const ContactFooter: React.FC<ContactFooterProps> = ({ contactInfo }) => {
   // Construct Dynamic Google Maps URL based on the fetched address
   const mapUrl = `https://maps.google.com/maps?q=${encodeURIComponent(contactInfo.address)}&t=&z=15&ie=UTF8&iwloc=&output=embed`;
 
+  // Helper to ensure phone link only contains digits and +
+  const cleanPhoneLink = (phone: string) => `tel:${phone.replace(/[^\d+]/g, '')}`;
+
   return (
     <footer id="contact" className="bg-brand-black text-white pt-20 border-t border-brand-gold/20">
       <div className="container mx-auto px-4 md:px-8 mb-16">
@@ -78,7 +81,7 @@ const ContactFooter: React.FC<ContactFooterProps> = ({ contactInfo }) => {
                {/* Phone */}
                <div className="flex items-center group">
                  <Phone className="text-brand-gold mr-4 flex-shrink-0 w-5 h-5 group-hover:text-white transition-colors" />
-                 <a href={`tel:${contactInfo.phone}`} className="text-gray-400 text-sm hover:text-white transition-colors font-sans tracking-wide">
+                 <a href={cleanPhoneLink(contactInfo.phone)} className="text-gray-400 text-sm hover:text-white transition-colors font-sans tracking-wide">
                    {contactInfo.phone}
                  </a>
                </div>

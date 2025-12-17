@@ -5,6 +5,8 @@ export interface MenuItem {
   category: string;
   isVegetarian?: boolean;
   image?: string;
+  categoryBackgroundImage?: string;
+  itemBackgroundImage?: string;
 }
 
 export interface FestivalSpecial {

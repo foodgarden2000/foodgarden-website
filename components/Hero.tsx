@@ -1,8 +1,13 @@
 import React from 'react';
 import { ChevronRight, ArrowDown } from 'lucide-react';
 import { RESTAURANT_INFO } from '../constants';
+import { ContactInfo } from '../types';
 
-const Hero: React.FC = () => {
+interface HeroProps {
+  contactInfo: ContactInfo;
+}
+
+const Hero: React.FC<HeroProps> = ({ contactInfo }) => {
   const handleScroll = (e: React.MouseEvent<HTMLAnchorElement>, href: string) => {
     e.preventDefault();
     const targetId = href.replace('#', '');
@@ -19,6 +24,9 @@ const Hero: React.FC = () => {
       });
     }
   };
+
+  // Helper to ensure phone link only contains digits and +
+  const cleanPhoneLink = (phone: string) => `tel:${phone.replace(/[^\d+]/g, '')}`;
 
   return (
     <section id="hero" className="relative h-screen flex items-center justify-center overflow-hidden">
@@ -64,7 +72,7 @@ const Hero: React.FC = () => {
             Reserve a Table
           </a>
           <a 
-            href={`tel:${RESTAURANT_INFO.phone}`}
+            href={cleanPhoneLink(contactInfo.phone)}
             className="px-10 py-4 border border-white/30 backdrop-blur-sm text-white font-bold text-sm uppercase tracking-widest hover:border-brand-gold hover:text-brand-gold transition-all duration-300 rounded-sm shadow-lg flex items-center justify-center group"
           >
             Call Now <ChevronRight className="ml-2 w-4 h-4 group-hover:translate-x-1 transition-transform" />

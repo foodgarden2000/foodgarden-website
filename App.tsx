@@ -89,7 +89,7 @@ const App: React.FC = () => {
     <div className="font-sans text-gray-900 bg-brand-cream pb-16 md:pb-0">
       <Navbar contactInfo={contactInfo} />
       <main>
-        <Hero />
+        <Hero contactInfo={contactInfo} />
         <About />
         <FestiveSpecials whatsappNumber={contactInfo.whatsapp} />
         <Menu whatsappNumber={contactInfo.whatsapp} />

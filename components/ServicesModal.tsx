@@ -12,6 +12,9 @@ interface ServicesModalProps {
 const ServicesModal: React.FC<ServicesModalProps> = ({ isOpen, onClose, contactInfo }) => {
   if (!isOpen) return null;
 
+  // Helper to ensure phone link only contains digits and +
+  const cleanPhoneLink = (phone: string) => `tel:${phone.replace(/[^\d+]/g, '')}`;
+
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
       <div className="bg-white rounded-xl shadow-2xl w-full max-w-4xl h-[85vh] md:h-[80vh] flex flex-col overflow-hidden animate-fade-in-up">
@@ -22,7 +25,7 @@ const ServicesModal: React.FC<ServicesModalProps> = ({ isOpen, onClose, contactI
             
             <div className="flex items-center gap-2 md:gap-3">
                 <a 
-                  href={`tel:${contactInfo.phone}`} 
+                  href={cleanPhoneLink(contactInfo.phone)}
                   className="hidden sm:flex items-center px-4 py-2 bg-green-600 text-white rounded font-bold text-sm hover:bg-green-700 transition-colors shadow-sm"
                 >
                     <Phone size={16} className="mr-2" /> Show Number
@@ -47,7 +50,7 @@ const ServicesModal: React.FC<ServicesModalProps> = ({ isOpen, onClose, contactI
         {/* Mobile Action Bar */}
         <div className="flex sm:hidden border-b border-gray-100">
              <a 
-                  href={`tel:${contactInfo.phone}`} 
+                  href={cleanPhoneLink(contactInfo.phone)}
                   className="flex-1 py-3 bg-green-600 text-white text-center font-bold text-sm flex items-center justify-center"
                 >
                     <Phone size={16} className="mr-2" /> Show Number

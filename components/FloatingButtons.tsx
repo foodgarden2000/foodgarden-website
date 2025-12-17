@@ -24,6 +24,9 @@ const FloatingButtons: React.FC<FloatingButtonsProps> = ({ phone, whatsappNumber
     }
   };
 
+  // Helper to ensure phone link only contains digits and +
+  const cleanPhoneLink = (phone: string) => `tel:${phone.replace(/[^\d+]/g, '')}`;
+
   return (
     <>
       {/* WhatsApp Button - Bottom Right */}
@@ -40,7 +43,7 @@ const FloatingButtons: React.FC<FloatingButtonsProps> = ({ phone, whatsappNumber
       {/* Sticky Call Button - Mobile Only - Bottom Bar */}
       <div className="md:hidden fixed bottom-0 left-0 w-full z-40 bg-brand-dark border-t border-gray-800 flex">
         <a 
-          href={`tel:${phone}`}
+          href={cleanPhoneLink(phone)}
           className="flex-1 py-4 bg-brand-red text-white text-center font-bold uppercase tracking-wider text-sm flex items-center justify-center"
         >
           <Phone size={18} className="mr-2" /> Call Now

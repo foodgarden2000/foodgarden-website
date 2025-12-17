@@ -33,7 +33,8 @@ const Menu: React.FC<MenuProps> = ({ whatsappNumber }) => {
   useEffect(() => {
     const fetchMenu = async () => {
       try {
-        const response = await fetch(MENU_SHEET_URL);
+        // Add timestamp to prevent caching of the Google Sheet CSV
+        const response = await fetch(`${MENU_SHEET_URL}&t=${Date.now()}`);
         if (!response.ok) throw new Error('Failed to fetch menu data');
         
         const csvText = await response.text();
@@ -62,7 +63,22 @@ const Menu: React.FC<MenuProps> = ({ whatsappNumber }) => {
     fetchMenu();
   }, []);
 
-  // CSV Parser with Fill-Down Logic
+  // Optimized Google Drive Image URL Converter
+  const getOptimizedImageURL = (url: string) => {
+    if (!url) return '';
+    const cleanUrl = url.trim();
+    if (cleanUrl.includes('drive.google.com') || cleanUrl.includes('docs.google.com')) {
+      // Regex to catch /d/ID, id=ID, open?id=ID
+      const idMatch = cleanUrl.match(/\/d\/(.*?)\/|\/d\/(.*?)$|id=(.*?)(&|$)/);
+      const id = idMatch ? (idMatch[1] || idMatch[2] || idMatch[3]) : null;
+      if (id) {
+        return `https://lh3.googleusercontent.com/d/${id}=w1000`;
+      }
+    }
+    return cleanUrl;
+  };
+
+  // CSV Parser with Fill-Down Logic and Background Support
   const parseCSV = (csvText: string): MenuItem[] => {
     const lines = csvText.split(/\r?\n/);
     if (lines.length < 2) return [];
@@ -88,32 +104,58 @@ const Menu: React.FC<MenuProps> = ({ whatsappNumber }) => {
 
     const headers = splitLine(lines[0]).map(h => h.toLowerCase().trim());
     
-    const catIdx = headers.findIndex(h => h === 'category' || (h.includes('category') && !h.includes('sub')));
-    const finalCatIdx = catIdx === -1 ? headers.findIndex(h => h.includes('category')) : catIdx;
-    
-    // Improved header detection
+    // Header Detection
     const getIndex = (keys: string[]) => headers.findIndex(h => keys.some(k => h.includes(k)));
+    
+    // Core Columns
+    const catIdx = headers.findIndex(h => h === 'category' || (h.includes('category') && !h.includes('sub') && !h.includes('bg') && !h.includes('background')));
+    const finalCatIdx = catIdx === -1 ? headers.findIndex(h => h.includes('category') && !h.includes('bg') && !h.includes('background')) : catIdx;
+    
     const subCatIdx = getIndex(['subcategory', 'sub category']);
     const itemIdx = getIndex(['item', 'dish', 'name']);
     const variantIdx = getIndex(['variant', 'description']);
     const priceIdx = getIndex(['price', 'rate', 'cost']);
-    const imgIdx = getIndex(['image', 'img', 'url', 'photo']);
+    const imgIdx = getIndex(['image', 'img', 'url', 'photo']); // Standard item image
+    
+    // New Background Columns - Broadened search
+    const catBgIdx = getIndex(['category background', 'category image', 'cat bg', 'category-bg', 'cat_bg', 'cat image', 'cover', 'header image']);
+    const itemBgIdx = getIndex(['item background', 'item bg', 'item-bg', 'card background', 'dish background']);
 
     let lastCategory = ''; 
+    let lastCatBg = '';
 
     return lines.slice(1).map(line => {
       if (!line.trim()) return null;
       const row = splitLine(line);
       
+      // Category Logic with Fill-Down
       const rawCategory = row[finalCatIdx]?.trim();
       let category = rawCategory;
 
       if (category) {
-        lastCategory = category;
+        // If explicit category is present
+        if (category !== lastCategory) {
+           // New category starting
+           lastCategory = category;
+           lastCatBg = ''; // Reset background for new category until found
+        }
       } else if (lastCategory) {
+        // Continuation of previous category
         category = lastCategory;
       } else {
         category = 'Other';
+      }
+
+      // Read Backgrounds
+      let categoryBackgroundImage = row[catBgIdx]?.trim();
+      const itemBackgroundImage = row[itemBgIdx]?.trim();
+
+      // Category Background Fill-down logic
+      if (categoryBackgroundImage) {
+          lastCatBg = categoryBackgroundImage;
+      } else {
+          // Inherit from current category's known background
+          categoryBackgroundImage = lastCatBg;
       }
 
       const name = row[itemIdx] || '';
@@ -121,7 +163,11 @@ const Menu: React.FC<MenuProps> = ({ whatsappNumber }) => {
       const variant = row[variantIdx];
       const subcat = row[subCatIdx];
       const description = [variant, subcat].filter(Boolean).join(' • ');
-      const image = row[imgIdx];
+      const rawImage = row[imgIdx];
+      
+      const image = getOptimizedImageURL(rawImage);
+      const optimizedCatBg = getOptimizedImageURL(categoryBackgroundImage);
+      const optimizedItemBg = getOptimizedImageURL(itemBackgroundImage);
 
       if (!name) return null;
 
@@ -131,30 +177,43 @@ const Menu: React.FC<MenuProps> = ({ whatsappNumber }) => {
         price: price ? (price.includes('₹') ? price : `₹${price}`) : '',
         description,
         image,
-        isVegetarian: true 
+        isVegetarian: true,
+        categoryBackgroundImage: optimizedCatBg,
+        itemBackgroundImage: optimizedItemBg
       };
     }).filter(item => item !== null) as MenuItem[];
   };
 
-  // Helper to get a representative image for a category
-  const getCategoryImage = (category: string) => {
+  // Logic for Category Card Thumbnail (Grid View)
+  const getCategoryDisplayImage = (category: string) => {
+    // 1. Try to find an item in this category that explicitly has a category BG set
+    // (Due to fill-down, most should have it if one does)
+    const itemWithCatBg = items.find(item => item.category === category && item.categoryBackgroundImage);
+    if (itemWithCatBg?.categoryBackgroundImage) return itemWithCatBg.categoryBackgroundImage;
+
+    // 2. Fallback to first item image
     const itemWithImage = items.find(item => item.category === category && item.image && item.image.startsWith('http'));
-    return itemWithImage?.image || `https://picsum.photos/600/400?random=${category.length}`;
+    if (itemWithImage?.image) return itemWithImage.image;
+
+    // 3. Fallback to random generator
+    let hash = 0;
+    for (let i = 0; i < category.length; i++) {
+        hash = category.charCodeAt(i) + ((hash << 5) - hash);
+    }
+    return `https://picsum.photos/600/400?random=${Math.abs(hash)}`;
   };
 
-  // Helper to get item count for a category
   const getCategoryCount = (category: string) => {
     return items.filter(item => item.category === category).length;
   };
 
   const handleCategoryClick = (category: string) => {
     setActiveCategory(category);
-    setVisibleCount(6); // Reset visible count when entering a category
-    // Smooth scroll to top of menu container
+    setVisibleCount(6);
     setTimeout(() => {
         const menuSection = document.getElementById('menu-content');
         if (menuSection) {
-            const yOffset = -100; // Offset for navbar
+            const yOffset = -100;
             const y = menuSection.getBoundingClientRect().top + window.pageYOffset + yOffset;
             window.scrollTo({top: y, behavior: 'smooth'});
         }
@@ -163,7 +222,6 @@ const Menu: React.FC<MenuProps> = ({ whatsappNumber }) => {
 
   const handleBackToCategories = () => {
     setActiveCategory(null);
-    // Scroll back to title
     setTimeout(() => {
         const menuTitle = document.getElementById('menu-title');
         if (menuTitle) {
@@ -172,7 +230,6 @@ const Menu: React.FC<MenuProps> = ({ whatsappNumber }) => {
     }, 50);
   };
 
-  // NEW: Open Modal instead of direct WhatsApp
   const handleOpenOrderModal = (item: MenuItem) => {
     setSelectedOrderItem(item);
     setOrderFormData({
@@ -225,7 +282,6 @@ const Menu: React.FC<MenuProps> = ({ whatsappNumber }) => {
 
   const handleSeeLess = () => {
     setVisibleCount(6);
-    // Scroll back to top of items list to prevent disorientation
     const listTop = document.getElementById('category-items-top');
     if (listTop) {
         const yOffset = -120;
@@ -238,11 +294,34 @@ const Menu: React.FC<MenuProps> = ({ whatsappNumber }) => {
     ? items.filter(item => item.category === activeCategory)
     : [];
 
-  // Slice the items based on visibleCount
   const visibleItems = displayedItems.slice(0, visibleCount);
 
+  // Helper to convert background strings to CSS styles
+  const getStyleFromValue = (value: string | undefined, isOverlayNeeded = false) => {
+      if (!value) return {};
+      const isUrl = value.startsWith('http') || value.startsWith('data:') || value.startsWith('/');
+      
+      const style: React.CSSProperties = isUrl 
+          ? { backgroundImage: `url(${value})`, backgroundSize: 'cover', backgroundPosition: 'center' } 
+          : { background: value };
+      
+      return { style, isUrl };
+  };
+
+  // Determine Active Category Background (for Section)
+  const activeCategoryBgValue = activeCategory 
+    ? items.find(i => i.category === activeCategory && i.categoryBackgroundImage)?.categoryBackgroundImage 
+    : null;
+  
+  const sectionBg = getStyleFromValue(activeCategoryBgValue);
+  const showSectionOverlay = !!activeCategoryBgValue && sectionBg.isUrl;
+
   return (
-    <section id="menu" className="py-24 bg-white min-h-screen relative">
+    <section 
+        id="menu" 
+        className="py-24 bg-white min-h-screen relative transition-all duration-700 ease-in-out"
+        style={sectionBg.style}
+    >
       <style>{`
         @keyframes fadeIn {
           from { opacity: 0; transform: translateY(20px); }
@@ -257,8 +336,20 @@ const Menu: React.FC<MenuProps> = ({ whatsappNumber }) => {
         }
       `}</style>
       
-      {/* Pattern Background */}
-      <div className="absolute inset-0 opacity-[0.03] bg-[url('https://www.transparenttextures.com/patterns/food.png')] pointer-events-none"></div>
+      {/* Default Pattern Background (hidden if custom bg active) */}
+      {!activeCategoryBgValue && (
+        <div className="absolute inset-0 opacity-[0.03] bg-[url('https://www.transparenttextures.com/patterns/food.png')] pointer-events-none"></div>
+      )}
+
+      {/* Overlay for Readability if Custom Background Image is set */}
+      {showSectionOverlay && (
+          <div className="absolute inset-0 bg-white/70 transition-opacity duration-700"></div>
+      )}
+      
+      {/* If simple color background, add light tint to ensure readability if dark color */}
+      {activeCategoryBgValue && !sectionBg.isUrl && (
+           <div className="absolute inset-0 bg-white/10 pointer-events-none"></div>
+      )}
 
       <div id="menu-content" className="container mx-auto px-4 md:px-8 relative z-10">
         
@@ -303,7 +394,7 @@ const Menu: React.FC<MenuProps> = ({ whatsappNumber }) => {
                     {/* Background Image with Zoom Effect */}
                     <div className="absolute inset-0 overflow-hidden">
                       <img 
-                        src={getCategoryImage(category)} 
+                        src={getCategoryDisplayImage(category)} 
                         alt={category} 
                         className="w-full h-full object-cover transition-transform duration-1000 group-hover:scale-110 opacity-70 group-hover:opacity-60"
                       />
@@ -343,7 +434,7 @@ const Menu: React.FC<MenuProps> = ({ whatsappNumber }) => {
                 <div id="category-items-top" className="mb-10 flex justify-start">
                   <button 
                     onClick={handleBackToCategories}
-                    className="group flex items-center px-6 py-3 bg-white border border-gray-200 hover:border-brand-gold text-brand-dark rounded-full transition-all duration-300 font-bold text-xs uppercase tracking-widest shadow-sm hover:shadow-md"
+                    className="group flex items-center px-6 py-3 bg-white/80 backdrop-blur border border-gray-200 hover:border-brand-gold text-brand-dark rounded-full transition-all duration-300 font-bold text-xs uppercase tracking-widest shadow-sm hover:shadow-md"
                   >
                     <ArrowLeft size={16} className="mr-2 group-hover:-translate-x-1 transition-transform" /> Back to Collections
                   </button>
@@ -351,68 +442,96 @@ const Menu: React.FC<MenuProps> = ({ whatsappNumber }) => {
 
                 {/* Items Grid */}
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-x-8 gap-y-12">
-                  {visibleItems.map((item, index) => (
-                    <div key={index} className="group flex flex-col h-full bg-transparent">
-                      {/* Image Area */}
-                      <div className="h-64 rounded-xl overflow-hidden relative shadow-lg mb-6 card-hover-effect transition-transform duration-300">
-                        {item.image ? (
-                           <img 
-                            src={item.image} 
-                            alt={item.name} 
-                            className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
-                            onError={(e) => {
-                              (e.target as HTMLImageElement).src = `https://picsum.photos/600/400?random=${index + 50}`;
-                            }}
-                          />
-                        ) : (
-                          <div className="w-full h-full flex items-center justify-center bg-brand-cream/50 text-brand-gold/50">
-                            <Utensils size={48} />
-                          </div>
-                        )}
-                        
-                        {/* Gradient Overlay on Image Hover */}
-                        <div className="absolute inset-0 bg-brand-black/40 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center">
-                            <button 
-                             onClick={() => handleOpenOrderModal(item)}
-                             className="px-6 py-3 bg-white text-brand-black font-bold uppercase tracking-widest text-xs transform translate-y-4 group-hover:translate-y-0 transition-all duration-300 hover:bg-brand-gold"
-                            >
-                                Order Now
-                            </button>
-                        </div>
-                      </div>
+                  {visibleItems.map((item, index) => {
+                      const itemBg = getStyleFromValue(item.itemBackgroundImage);
+                      const hasCustomItemBg = !!item.itemBackgroundImage;
+                      
+                      // Logic: If item has a background image, we want it visible.
+                      // Use a dark overlay so white text pops. 
+                      // If no background image, use standard layout.
+                      const overlayClass = hasCustomItemBg && itemBg.isUrl 
+                          ? 'bg-black/60' // Dark overlay for BG images, REMOVED BLUR
+                          : '';
+                          
+                      const textColorClass = hasCustomItemBg && itemBg.isUrl
+                          ? 'text-white'
+                          : 'text-brand-black';
 
-                      {/* Content Area */}
-                      <div className="flex-1 flex flex-col px-2">
-                        <div className="flex justify-between items-start mb-2">
-                          <h4 className="text-xl font-serif font-bold text-brand-black leading-tight group-hover:text-brand-gold transition-colors duration-300">
-                            {item.name}
-                          </h4>
-                          <span className="text-lg font-bold text-brand-gold font-serif whitespace-nowrap ml-4">
-                            {item.price || ''}
-                          </span>
+                      const subTextColorClass = hasCustomItemBg && itemBg.isUrl
+                          ? 'text-gray-200'
+                          : 'text-gray-500';
+
+                      return (
+                        <div 
+                          key={index} 
+                          className={`group flex flex-col h-full rounded-xl transition-all duration-300 ${hasCustomItemBg ? 'shadow-lg hover:shadow-2xl overflow-hidden' : 'bg-transparent'}`}
+                          style={itemBg.style}
+                        >
+                          {/* Inner container */}
+                          <div className={`flex flex-col h-full ${overlayClass}`}>
+                              
+                              {/* Image Area */}
+                              <div className={`h-64 overflow-hidden relative shadow-lg mb-6 card-hover-effect transition-transform duration-300 ${hasCustomItemBg ? 'rounded-none mx-0 mt-0 shadow-none border-b border-white/10' : 'rounded-xl'}`}>
+                                {item.image ? (
+                                  <img 
+                                    src={item.image} 
+                                    alt={item.name} 
+                                    className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
+                                    onError={(e) => {
+                                      (e.target as HTMLImageElement).src = `https://picsum.photos/600/400?random=${index + 50}`;
+                                    }}
+                                  />
+                                ) : (
+                                  <div className="w-full h-full flex items-center justify-center bg-brand-cream/50 text-brand-gold/50">
+                                    <Utensils size={48} />
+                                  </div>
+                                )}
+                                
+                                {/* Gradient Overlay on Image Hover */}
+                                <div className="absolute inset-0 bg-brand-black/40 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center">
+                                    <button 
+                                    onClick={() => handleOpenOrderModal(item)}
+                                    className="px-6 py-3 bg-white text-brand-black font-bold uppercase tracking-widest text-xs transform translate-y-4 group-hover:translate-y-0 transition-all duration-300 hover:bg-brand-gold"
+                                    >
+                                        Order Now
+                                    </button>
+                                </div>
+                              </div>
+
+                              {/* Content Area */}
+                              <div className={`flex-1 flex flex-col px-4 ${hasCustomItemBg ? 'pb-4' : 'px-2'}`}>
+                                <div className="flex justify-between items-start mb-2">
+                                  <h4 className={`text-xl font-serif font-bold leading-tight group-hover:text-brand-gold transition-colors duration-300 ${textColorClass}`}>
+                                    {item.name}
+                                  </h4>
+                                  <span className="text-lg font-bold text-brand-gold font-serif whitespace-nowrap ml-4">
+                                    {item.price || ''}
+                                  </span>
+                                </div>
+                                
+                                {item.description && (
+                                  <p className={`text-sm mb-4 line-clamp-2 leading-relaxed font-light ${subTextColorClass}`}>
+                                    {item.description}
+                                  </p>
+                                )}
+                                
+                                <div className={`mt-auto pt-4 border-t border-dashed flex items-center justify-between ${hasCustomItemBg ? 'border-white/20' : 'border-gray-200'}`}>
+                                  <span className={`text-[10px] uppercase tracking-widest font-semibold ${subTextColorClass}`}>
+                                    {item.category}
+                                  </span>
+                                  
+                                  <button 
+                                    onClick={() => handleOpenOrderModal(item)}
+                                    className="md:hidden flex items-center text-brand-gold font-bold text-xs uppercase tracking-wider"
+                                  >
+                                    <ShoppingBag size={14} className="mr-1" /> Add
+                                  </button>
+                                </div>
+                              </div>
+                          </div>
                         </div>
-                        
-                        {item.description && (
-                          <p className="text-gray-500 text-sm mb-4 line-clamp-2 leading-relaxed font-light">
-                            {item.description}
-                          </p>
-                        )}
-                        
-                        <div className="mt-auto pt-4 border-t border-dashed border-gray-200 flex items-center justify-between">
-                           <span className="text-[10px] text-gray-400 uppercase tracking-widest font-semibold">
-                             {item.category}
-                           </span>
-                           
-                           <button 
-                             onClick={() => handleOpenOrderModal(item)}
-                             className="md:hidden flex items-center text-brand-gold font-bold text-xs uppercase tracking-wider"
-                           >
-                             <ShoppingBag size={14} className="mr-1" /> Add
-                           </button>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
+                      );
+                  })}
                 </div>
 
                 {/* Pagination Controls */}
@@ -421,7 +540,7 @@ const Menu: React.FC<MenuProps> = ({ whatsappNumber }) => {
                   {displayedItems.length > visibleCount && (
                     <button 
                       onClick={() => setVisibleCount(prev => prev + 6)}
-                      className="group flex items-center gap-2 px-10 py-4 border border-brand-gold text-brand-gold font-bold uppercase tracking-widest text-xs hover:bg-brand-gold hover:text-brand-black transition-all duration-300 shadow-md hover:shadow-xl rounded-sm"
+                      className="group flex items-center gap-2 px-10 py-4 border border-brand-gold text-brand-gold font-bold uppercase tracking-widest text-xs hover:bg-brand-gold hover:text-brand-black transition-all duration-300 shadow-md hover:shadow-xl rounded-sm bg-white/50 backdrop-blur"
                     >
                       See More Dishes <ChevronDown className="w-4 h-4 group-hover:translate-y-1 transition-transform" />
                     </button>
@@ -431,7 +550,7 @@ const Menu: React.FC<MenuProps> = ({ whatsappNumber }) => {
                   {visibleCount > 6 && (
                     <button 
                       onClick={handleSeeLess}
-                      className="group flex items-center gap-2 px-10 py-4 border border-brand-dark/20 text-brand-dark font-bold uppercase tracking-widest text-xs hover:bg-brand-dark hover:text-white transition-all duration-300 shadow-sm hover:shadow-lg rounded-sm"
+                      className="group flex items-center gap-2 px-10 py-4 border border-brand-dark/20 text-brand-dark font-bold uppercase tracking-widest text-xs hover:bg-brand-dark hover:text-white transition-all duration-300 shadow-sm hover:shadow-lg rounded-sm bg-white/50 backdrop-blur"
                     >
                       See Less <ChevronUp className="w-4 h-4 group-hover:-translate-y-1 transition-transform" />
                     </button>
