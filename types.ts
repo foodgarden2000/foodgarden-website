@@ -15,20 +15,25 @@ export interface CategoryConfig {
   image: string;
 }
 
+export type OrderStatus = 'pending' | 'accepted' | 'preparing' | 'out_for_delivery' | 'delivered' | 'cancelled';
+export type OrderType = 'delivery' | 'table_booking' | 'cabin_booking';
+
 export interface Order {
   id?: string;
-  userId: string | null; // null for guest
+  userId: string | null;
   userName: string;
   userPhone: string;
   address: string;
   itemName: string;
+  orderType: OrderType;
   orderAmount: number;
   quantity: number;
-  status: 'pending' | 'delivered' | 'cancelled';
+  status: OrderStatus;
   pointsEarned: number;
   pointsCredited: boolean;
   createdAt: string;
   deliveredAt?: string;
+  notes?: string;
 }
 
 export interface UserProfile {

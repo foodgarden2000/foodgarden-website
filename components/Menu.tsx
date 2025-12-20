@@ -1,10 +1,10 @@
 
 import React, { useState, useEffect } from 'react';
 import { db } from '../firebase';
-import { collection, onSnapshot, query, orderBy, addDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+import { collection, onSnapshot, query, orderBy, addDoc, doc, getDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 import { User } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
-import { Utensils, Loader2, ArrowLeft, X, Minus, Plus, Award, ChevronRight } from 'lucide-react';
-import { MenuItem, CategoryConfig, Order } from '../types';
+import { Utensils, Loader2, ArrowLeft, X, Minus, Plus, Award, ChevronRight, Truck, Coffee, Sofa } from 'lucide-react';
+import { MenuItem, CategoryConfig, Order, OrderType, UserProfile } from '../types';
 import { getOptimizedImageURL } from '../constants';
 
 interface MenuProps {
@@ -21,9 +21,15 @@ const Menu: React.FC<MenuProps> = ({ whatsappNumber, user, currentPoints }) => {
   const [uniqueCategories, setUniqueCategories] = useState<string[]>([]);
   const [isOrderModalOpen, setIsOrderModalOpen] = useState(false);
   const [selectedOrderItem, setSelectedOrderItem] = useState<MenuItem | null>(null);
+  const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   
   const [orderFormData, setOrderFormData] = useState({
-    name: '', phone: '', address: '', quantity: 1, note: ''
+    name: '', 
+    phone: '', 
+    address: '', 
+    quantity: 1, 
+    notes: '',
+    type: 'delivery' as OrderType
   });
 
   useEffect(() => {
@@ -45,13 +51,20 @@ const Menu: React.FC<MenuProps> = ({ whatsappNumber, user, currentPoints }) => {
       setLoading(false);
     });
 
+    if (user) {
+      getDoc(doc(db, "users", user.uid)).then(snap => {
+        if (snap.exists()) setUserProfile(snap.data() as UserProfile);
+      });
+    }
+
     return () => { unsubCats(); unsubMenu(); };
-  }, []);
+  }, [user]);
 
   const calculatePotentialPoints = (priceStr: string, quantity: number) => {
-    if (!user) return 0;
     const cleanPrice = parseInt(priceStr.replace(/\D/g, '')) || 0;
-    return Math.floor(cleanPrice * quantity * 0.1); // 10% points
+    const total = cleanPrice * quantity;
+    const rate = userProfile?.role === 'subscriber' ? 0.15 : 0.10;
+    return Math.floor(total * rate);
   };
 
   const submitOrder = async (e: React.FormEvent) => {
@@ -67,24 +80,32 @@ const Menu: React.FC<MenuProps> = ({ whatsappNumber, user, currentPoints }) => {
       userPhone: orderFormData.phone,
       address: orderFormData.address,
       itemName: selectedOrderItem.name,
+      orderType: orderFormData.type,
       orderAmount: cleanPrice * orderFormData.quantity,
       quantity: orderFormData.quantity,
       status: 'pending',
       pointsEarned: potentialPoints,
       pointsCredited: false,
+      notes: orderFormData.notes,
       createdAt: new Date().toISOString()
     };
 
     try {
-      // 1. Create Order in Firestore
-      await addDoc(collection(db, "orders"), orderData);
+      const docRef = await addDoc(collection(db, "orders"), orderData);
+      
+      const message = `*NEW ${orderFormData.type.replace('_', ' ').toUpperCase()} - Chef's Jalsa*\n` +
+                      `*Order ID:* ${docRef.id}\n` +
+                      `*Item:* ${selectedOrderItem.name}\n` +
+                      `*Qty:* ${orderFormData.quantity}\n` +
+                      `*Total:* ₹${orderData.orderAmount}\n\n` +
+                      `*Customer Details:*\n👤 ${orderFormData.name}\n📞 ${orderFormData.phone}\n📍 ${orderFormData.address}\n` +
+                      (orderFormData.notes ? `📝 Notes: ${orderFormData.notes}\n` : '') +
+                      (user ? `\n_Points will be credited upon completion!_` : '');
 
-      // 2. Open WhatsApp for Customer
-      const message = `*NEW ORDER - Chef's Jalsa* 🍽️\n*Item:* ${selectedOrderItem.name}\n*Price:* ${selectedOrderItem.price}\n*Quantity:* ${orderFormData.quantity}\n\n*Customer Details:*\n👤 Name: ${orderFormData.name}\n📞 Phone: ${orderFormData.phone}\n📍 Address: ${orderFormData.address}${user ? `\n\n_Points will be credited upon delivery!_` : ''}`;
       window.open(`https://wa.me/${whatsappNumber}?text=${encodeURIComponent(message)}`, '_blank');
       
       setIsOrderModalOpen(false);
-      alert("Order placed successfully! Redirecting to WhatsApp...");
+      alert("Order submitted to Chef's Jalsa! You can track live status in your dashboard.");
     } catch (err) { 
       console.error(err);
       alert("Error processing order. Please try again.");
@@ -95,7 +116,6 @@ const Menu: React.FC<MenuProps> = ({ whatsappNumber, user, currentPoints }) => {
     <section id="menu" className="py-24 bg-white min-h-screen relative overflow-hidden">
       <div className="container mx-auto px-4 md:px-8">
         
-        {/* Points Display Bar - ONLY for logged in users */}
         {user && (
           <div className="mb-12 bg-brand-dark p-6 rounded-2xl flex flex-col md:flex-row items-center justify-between border border-brand-gold/30 shadow-xl gap-4">
              <div className="flex items-center gap-4">
@@ -104,12 +124,12 @@ const Menu: React.FC<MenuProps> = ({ whatsappNumber, user, currentPoints }) => {
                 </div>
                 <div>
                    <h4 className="text-white font-display text-xl">Loyalty Rewards</h4>
-                   <p className="text-gray-400 text-sm">Earn 10% points on every delivered order</p>
+                   <p className="text-gray-400 text-sm">Earn {userProfile?.role === 'subscriber' ? '15%' : '10%'} points on every delivered order</p>
                 </div>
              </div>
              <div className="text-center md:text-right">
                 <div className="text-4xl font-bold text-brand-gold">{currentPoints}</div>
-                <div className="text-gray-400 text-xs uppercase tracking-widest">Available Points</div>
+                <div className="text-gray-400 text-xs uppercase tracking-widest">Available Points (₹{currentPoints / 2} Value)</div>
              </div>
           </div>
         )}
@@ -131,19 +151,13 @@ const Menu: React.FC<MenuProps> = ({ whatsappNumber, user, currentPoints }) => {
                 className="group relative h-72 rounded-xl overflow-hidden cursor-pointer shadow-xl bg-brand-black transition-all duration-500 hover:-translate-y-2"
               >
                 {categoryConfigs[cat] ? (
-                  <img 
-                    src={getOptimizedImageURL(categoryConfigs[cat])} 
-                    className="absolute inset-0 w-full h-full object-cover transform group-hover:scale-110 transition-transform duration-1000" 
-                    alt={cat} 
-                  />
+                  <img src={getOptimizedImageURL(categoryConfigs[cat])} className="absolute inset-0 w-full h-full object-cover transform group-hover:scale-110 transition-transform duration-1000" alt={cat} />
                 ) : (
                   <div className="absolute inset-0 bg-brand-dark flex items-center justify-center opacity-40">
                     <Utensils className="text-brand-gold/20 w-32 h-32" />
                   </div>
                 )}
-                
                 <div className="absolute inset-0 bg-gradient-to-t from-brand-black via-brand-black/40 to-transparent z-10 transition-colors group-hover:bg-brand-black/20"></div>
-                
                 <div className="absolute inset-0 flex flex-col items-center justify-center z-20 text-center p-6">
                   <h3 className="text-4xl font-display font-bold text-white mb-4 tracking-wider group-hover:scale-105 transition-transform">{cat}</h3>
                   <div className="flex items-center gap-2 text-brand-gold opacity-0 group-hover:opacity-100 transition-all transform translate-y-4 group-hover:translate-y-0">
@@ -175,10 +189,7 @@ const Menu: React.FC<MenuProps> = ({ whatsappNumber, user, currentPoints }) => {
                       <span className="text-brand-gold font-bold text-lg">{item.price}</span>
                     </div>
                     <p className="text-gray-500 text-sm mb-8 flex-1 leading-relaxed">{item.description}</p>
-                    <button 
-                      onClick={() => { setSelectedOrderItem(item); setIsOrderModalOpen(true); }}
-                      className="w-full py-4 bg-brand-dark text-white rounded-lg font-bold uppercase text-xs tracking-widest hover:bg-brand-gold hover:text-brand-black transition-all shadow-md active:scale-95"
-                    >
+                    <button onClick={() => { setSelectedOrderItem(item); setIsOrderModalOpen(true); }} className="w-full py-4 bg-brand-dark text-white rounded-lg font-bold uppercase text-xs tracking-widest hover:bg-brand-gold hover:text-brand-black transition-all shadow-md active:scale-95">
                       {user ? 'Order & Earn Points' : 'Order Now'}
                     </button>
                   </div>
@@ -191,27 +202,46 @@ const Menu: React.FC<MenuProps> = ({ whatsappNumber, user, currentPoints }) => {
 
       {isOrderModalOpen && selectedOrderItem && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/90 backdrop-blur-md animate-fade-in">
-          <div className="bg-white rounded-2xl w-full max-w-md overflow-hidden animate-fade-in-up shadow-2xl">
-            <div className="p-6 bg-brand-dark text-white flex justify-between items-center">
+          <div className="bg-white rounded-2xl w-full max-w-lg overflow-hidden animate-fade-in-up shadow-2xl flex flex-col max-h-[90vh]">
+            <div className="p-6 bg-brand-dark text-white flex justify-between items-center shrink-0">
               <div>
                 <h3 className="text-2xl font-serif">Checkout</h3>
-                <p className="text-xs text-brand-gold tracking-widest uppercase mt-1">Order Details</p>
+                <p className="text-xs text-brand-gold tracking-widest uppercase mt-1">Real-Time Processing</p>
               </div>
               <button onClick={() => setIsOrderModalOpen(false)} className="p-2 hover:bg-white/10 rounded-full transition-colors"><X /></button>
             </div>
-            <form onSubmit={submitOrder} className="p-8 space-y-6">
+            
+            <form onSubmit={submitOrder} className="p-8 space-y-6 overflow-y-auto">
+              <div className="grid grid-cols-3 gap-3">
+                {[
+                  { id: 'delivery', label: 'Delivery', icon: Truck },
+                  { id: 'table_booking', label: 'Table', icon: Coffee },
+                  { id: 'cabin_booking', label: 'Cabin', icon: Sofa }
+                ].map(type => (
+                  <button
+                    key={type.id}
+                    type="button"
+                    onClick={() => setOrderFormData({...orderFormData, type: type.id as OrderType})}
+                    className={`flex flex-col items-center justify-center p-4 rounded-xl border transition-all ${orderFormData.type === type.id ? 'border-brand-gold bg-brand-gold/10 text-brand-black' : 'border-gray-100 text-gray-400 hover:bg-gray-50'}`}
+                  >
+                    <type.icon size={20} className="mb-2" />
+                    <span className="text-[10px] font-bold uppercase tracking-widest">{type.label}</span>
+                  </button>
+                ))}
+              </div>
+
               {user && (
                 <div className="bg-brand-gold/10 p-5 rounded-xl border border-brand-gold/30 flex items-center justify-between">
                   <div>
-                    <span className="text-xs font-bold text-brand-black/60 uppercase tracking-widest block mb-1">Expected Points</span>
-                    <span className="text-2xl font-display font-bold text-brand-red">+{calculatePotentialPoints(selectedOrderItem.price || "0", orderFormData.quantity)}</span>
+                    <span className="text-xs font-bold text-brand-black/60 uppercase tracking-widest block mb-1">Potential Rewards</span>
+                    <span className="text-2xl font-display font-bold text-brand-red">+{calculatePotentialPoints(selectedOrderItem.price || "0", orderFormData.quantity)} Points</span>
                   </div>
                   <Award size={32} className="text-brand-gold" />
                 </div>
               )}
               
               <div className="flex items-center justify-between border-b border-gray-100 pb-6">
-                <div>
+                <div className="flex-1">
                   <span className="font-bold text-lg block">{selectedOrderItem.name}</span>
                   <span className="text-gray-500 text-sm">{selectedOrderItem.price} / unit</span>
                 </div>
@@ -223,13 +253,19 @@ const Menu: React.FC<MenuProps> = ({ whatsappNumber, user, currentPoints }) => {
               </div>
 
               <div className="space-y-4">
-                <input type="text" placeholder="Full Name" required className="w-full p-4 bg-gray-50 border border-gray-200 rounded-xl focus:border-brand-gold outline-none transition-all" onChange={e => setOrderFormData({...orderFormData, name: e.target.value})} />
-                <input type="tel" placeholder="WhatsApp Phone Number" required className="w-full p-4 bg-gray-50 border border-gray-200 rounded-xl focus:border-brand-gold outline-none transition-all" onChange={e => setOrderFormData({...orderFormData, phone: e.target.value})} />
-                <textarea placeholder="Delivery Address" required className="w-full p-4 bg-gray-50 border border-gray-200 rounded-xl focus:border-brand-gold outline-none transition-all h-24 resize-none" onChange={e => setOrderFormData({...orderFormData, address: e.target.value})}></textarea>
+                <input type="text" placeholder="Full Name" required className="w-full p-4 bg-gray-50 border border-gray-200 rounded-xl focus:border-brand-gold outline-none" onChange={e => setOrderFormData({...orderFormData, name: e.target.value})} />
+                <input type="tel" placeholder="WhatsApp Number" required className="w-full p-4 bg-gray-50 border border-gray-200 rounded-xl focus:border-brand-gold outline-none" onChange={e => setOrderFormData({...orderFormData, phone: e.target.value})} />
+                <textarea 
+                  placeholder={orderFormData.type === 'delivery' ? "Delivery Address" : "Table/Cabin Pref (e.g. Near Window)"} 
+                  required 
+                  className="w-full p-4 bg-gray-50 border border-gray-200 rounded-xl focus:border-brand-gold outline-none h-24 resize-none" 
+                  onChange={e => setOrderFormData({...orderFormData, address: e.target.value})} 
+                />
+                <input type="text" placeholder="Special Instructions (e.g. Extra spicy)" className="w-full p-4 bg-gray-50 border border-gray-200 rounded-xl focus:border-brand-gold outline-none" onChange={e => setOrderFormData({...orderFormData, notes: e.target.value})} />
               </div>
 
               <button type="submit" className="w-full py-5 bg-brand-gold text-brand-black font-bold uppercase tracking-[0.2em] rounded-xl shadow-xl hover:bg-brand-black hover:text-white transition-all transform active:scale-95">
-                Confirm Order
+                Place Real-Time Order
               </button>
             </form>
           </div>
