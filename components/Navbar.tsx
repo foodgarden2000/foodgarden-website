@@ -1,137 +1,128 @@
+
 import React, { useState, useEffect } from 'react';
-import { Menu, X } from 'lucide-react';
+import { Menu as MenuIcon, X, Award, LogOut, User, LayoutDashboard, LogIn } from 'lucide-react';
 import { ContactInfo } from '../types';
+import { auth } from '../firebase';
+import { signOut, User as FirebaseUser } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
 import ServicesModal from './ServicesModal';
 
 interface NavbarProps {
   contactInfo: ContactInfo;
+  points: number;
+  user: FirebaseUser | null;
+  onNavigate: (view: 'home' | 'dashboard' | 'admin') => void;
+  currentView: string;
 }
 
-const Navbar: React.FC<NavbarProps> = ({ contactInfo }) => {
+const Navbar: React.FC<NavbarProps> = ({ contactInfo, points, user, onNavigate, currentView }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const [isServiceModalOpen, setIsServiceModalOpen] = useState(false);
 
   useEffect(() => {
-    const handleScroll = () => {
-      setScrolled(window.scrollY > 20);
-    };
+    const handleScroll = () => setScrolled(window.scrollY > 20);
     window.addEventListener('scroll', handleScroll);
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
-  const navLinks = [
-    { name: 'Home', href: '#hero' },
-    { name: 'About', href: '#about' },
-    { name: 'Services', href: '#services', isAction: true },
-    { name: 'Festivals', href: '#festivals' },
-    { name: 'Menu', href: '#menu' },
-    { name: 'Gallery', href: '#gallery' },
-    { name: 'Contact', href: '#contact' },
-  ];
-
-  // Custom Smooth Scroll Function
-  const handleScroll = (e: React.MouseEvent<HTMLAnchorElement>, href: string, isAction?: boolean) => {
+  const handleLinkClick = (e: React.MouseEvent<HTMLAnchorElement>, href: string) => {
     e.preventDefault();
-    setIsOpen(false); // Close mobile menu if open
+    setIsOpen(false);
     
-    if (isAction && href === '#services') {
-      setIsServiceModalOpen(true);
-      return;
-    }
-    
-    const targetId = href.replace('#', '');
-    const element = document.getElementById(targetId);
-    
-    if (element) {
-      const headerOffset = 90; // Height of the fixed navbar
-      const elementPosition = element.getBoundingClientRect().top;
-      const offsetPosition = elementPosition + window.scrollY - headerOffset;
-  
-      window.scrollTo({
-        top: offsetPosition,
-        behavior: "smooth"
-      });
+    if (currentView !== 'home') {
+      onNavigate('home');
+      // Delay scroll until home view is rendered
+      setTimeout(() => {
+        const element = document.getElementById(href.replace('#', ''));
+        if (element) {
+          window.scrollTo({ top: element.offsetTop - 90, behavior: "smooth" });
+        }
+      }, 100);
+    } else {
+      const element = document.getElementById(href.replace('#', ''));
+      if (element) {
+        window.scrollTo({ top: element.offsetTop - 90, behavior: "smooth" });
+      }
     }
   };
 
   return (
     <>
-      <nav className={`fixed w-full z-50 transition-all duration-500 ease-in-out ${scrolled ? 'glass py-3 shadow-2xl' : 'bg-transparent py-6'}`}>
+      <nav className={`fixed w-full z-50 transition-all duration-500 ${scrolled || currentView !== 'home' ? 'glass py-3 shadow-xl' : 'bg-transparent py-6'}`}>
         <div className="container mx-auto px-4 md:px-8 flex justify-between items-center">
-          {/* Logo */}
-          <a 
-            href="#hero" 
-            onClick={(e) => handleScroll(e, '#hero')}
-            className="flex flex-col items-center group relative z-50"
-          >
-              <h1 className="text-2xl md:text-3xl font-display font-bold text-brand-gold tracking-widest group-hover:text-white transition-colors drop-shadow-md">
-                CHEF’S JALSA
-              </h1>
-              <div className="h-0.5 w-1/2 bg-brand-gold transform scale-x-0 group-hover:scale-x-100 transition-transform duration-300"></div>
-          </a>
+          <button onClick={() => onNavigate('home')} className="flex flex-col items-center">
+            <h1 className="text-2xl font-display font-bold text-brand-gold tracking-widest">CHEF’S JALSA</h1>
+            <div className="h-0.5 w-12 bg-brand-gold"></div>
+          </button>
 
-          {/* Desktop Menu */}
+          {/* Desktop */}
           <div className="hidden lg:flex items-center space-x-8">
-            {navLinks.map((link) => (
-              <a
-                key={link.name}
-                href={link.href}
-                onClick={(e) => handleScroll(e, link.href, link.isAction)}
-                className="text-white hover:text-brand-gold text-xs font-semibold tracking-[0.15em] transition-all duration-300 uppercase relative group"
+            {['About', 'Festivals', 'Menu', 'Contact'].map(link => (
+              <a 
+                key={link} 
+                href={`#${link.toLowerCase()}`} 
+                onClick={e => handleLinkClick(e, `#${link.toLowerCase()}`)}
+                className="text-white hover:text-brand-gold text-xs font-semibold uppercase tracking-widest transition-colors"
               >
-                {link.name}
-                <span className="absolute -bottom-2 left-0 w-0 h-px bg-brand-gold transition-all duration-300 group-hover:w-full"></span>
+                {link}
               </a>
             ))}
-            <a 
-              href="#reservation"
-              onClick={(e) => handleScroll(e, '#reservation')}
-              className="px-6 py-2.5 bg-transparent border border-brand-gold text-brand-gold font-bold text-xs uppercase tracking-widest hover:bg-brand-gold hover:text-brand-black transition-all duration-300 rounded-sm"
+
+            <button 
+              onClick={() => onNavigate('dashboard')}
+              className="flex items-center gap-2 px-6 py-2 border border-brand-gold text-brand-gold font-bold text-xs uppercase hover:bg-brand-gold hover:text-brand-black transition-all"
             >
-              Reserve
-            </a>
+              {user ? (
+                <>
+                  <LayoutDashboard size={14} /> Dashboard
+                </>
+              ) : (
+                <>
+                  <LogIn size={14} /> Login
+                </>
+              )}
+            </button>
           </div>
 
-          {/* Mobile Menu Button */}
-          <button 
-            className="lg:hidden text-brand-gold z-50 hover:text-white transition-colors"
-            onClick={() => setIsOpen(!isOpen)}
-          >
-            {isOpen ? <X size={28} /> : <Menu size={28} />}
+          <button className="lg:hidden text-brand-gold" onClick={() => setIsOpen(!isOpen)}>
+            {isOpen ? <X size={28} /> : <MenuIcon size={28} />}
           </button>
         </div>
 
-        {/* Mobile Menu Overlay */}
-        <div className={`lg:hidden fixed inset-0 bg-brand-black/95 backdrop-blur-xl z-40 transition-transform duration-500 ease-in-out ${isOpen ? 'translate-x-0' : 'translate-x-full'}`}>
+        {/* Mobile Overlay */}
+        <div className={`lg:hidden fixed inset-0 bg-brand-black/95 transition-transform duration-500 ${isOpen ? 'translate-x-0' : 'translate-x-full'}`}>
           <div className="flex flex-col items-center justify-center h-full space-y-8">
-             {navLinks.map((link) => (
-                <a
-                  key={link.name}
-                  href={link.href}
-                  className="text-2xl font-serif text-white hover:text-brand-gold tracking-widest transition-colors"
-                  onClick={(e) => handleScroll(e, link.href, link.isAction)}
+              {['Home', 'About', 'Menu', 'Gallery', 'Contact'].map(link => (
+                <a 
+                  key={link} 
+                  href={`#${link.toLowerCase()}`} 
+                  onClick={e => handleLinkClick(e, `#${link.toLowerCase()}`)} 
+                  className="text-2xl text-white font-serif uppercase tracking-widest"
                 >
-                  {link.name}
+                  {link}
                 </a>
               ))}
-              <a 
-                href="#reservation"
-                onClick={(e) => handleScroll(e, '#reservation')}
-                className="px-10 py-4 border border-brand-gold text-brand-gold font-bold text-sm uppercase tracking-widest hover:bg-brand-gold hover:text-brand-black transition-all duration-300 mt-4"
+              
+              <button 
+                onClick={() => { onNavigate('dashboard'); setIsOpen(false); }}
+                className="px-10 py-4 bg-brand-gold text-brand-black font-bold uppercase tracking-widest text-sm rounded-full flex items-center gap-2"
               >
-                Book A Table
-              </a>
+                {user ? <LayoutDashboard size={18} /> : <LogIn size={18} />}
+                {user ? "User Dashboard" : "Sign In / Register"}
+              </button>
+
+              {user && (
+                <button 
+                  onClick={() => { signOut(auth); setIsOpen(false); }} 
+                  className="text-brand-red font-bold uppercase tracking-widest text-sm flex items-center gap-2 pt-8"
+                >
+                  <LogOut size={16} /> Sign Out
+                </button>
+              )}
           </div>
         </div>
       </nav>
-
-      {/* Services Modal */}
-      <ServicesModal 
-        isOpen={isServiceModalOpen} 
-        onClose={() => setIsServiceModalOpen(false)} 
-        contactInfo={contactInfo}
-      />
+      <ServicesModal isOpen={isServiceModalOpen} onClose={() => setIsServiceModalOpen(false)} contactInfo={contactInfo} />
     </>
   );
 };

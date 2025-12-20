@@ -1,13 +1,15 @@
+
 import React from 'react';
 import { RESTAURANT_INFO } from '../constants';
 import { ContactInfo } from '../types';
-import { MapPin, Phone, Clock, Facebook, Instagram, ChevronRight, Mail, MessageCircle } from 'lucide-react';
+import { MapPin, Phone, Clock, Facebook, Instagram, ChevronRight, Mail, MessageCircle, Lock } from 'lucide-react';
 
 interface ContactFooterProps {
   contactInfo: ContactInfo;
+  onAdminLogin?: () => void;
 }
 
-const ContactFooter: React.FC<ContactFooterProps> = ({ contactInfo }) => {
+const ContactFooter: React.FC<ContactFooterProps> = ({ contactInfo, onAdminLogin }) => {
   // Construct Dynamic Google Maps URL based on the fetched address
   const mapUrl = `https://maps.google.com/maps?q=${encodeURIComponent(contactInfo.address)}&t=&z=15&ie=UTF8&iwloc=&output=embed`;
 
@@ -70,7 +72,6 @@ const ContactFooter: React.FC<ContactFooterProps> = ({ contactInfo }) => {
             <h3 className="text-brand-gold font-sans font-bold uppercase tracking-widest text-xs mb-8">Contact Us</h3>
              
              <div className="space-y-6">
-               {/* Address */}
                <div className="flex items-start group">
                  <MapPin className="text-brand-gold mt-1 mr-4 flex-shrink-0 w-5 h-5 group-hover:text-white transition-colors" />
                  <p className="text-gray-400 text-sm leading-relaxed w-3/4 group-hover:text-white transition-colors">
@@ -78,7 +79,6 @@ const ContactFooter: React.FC<ContactFooterProps> = ({ contactInfo }) => {
                  </p>
                </div>
 
-               {/* Phone */}
                <div className="flex items-center group">
                  <Phone className="text-brand-gold mr-4 flex-shrink-0 w-5 h-5 group-hover:text-white transition-colors" />
                  <a href={cleanPhoneLink(contactInfo.phone)} className="text-gray-400 text-sm hover:text-white transition-colors font-sans tracking-wide">
@@ -86,7 +86,6 @@ const ContactFooter: React.FC<ContactFooterProps> = ({ contactInfo }) => {
                  </a>
                </div>
 
-               {/* WhatsApp */}
                <div className="flex items-center group">
                  <MessageCircle className="text-brand-gold mr-4 flex-shrink-0 w-5 h-5 group-hover:text-white transition-colors" />
                  <a 
@@ -99,7 +98,6 @@ const ContactFooter: React.FC<ContactFooterProps> = ({ contactInfo }) => {
                  </a>
                </div>
 
-               {/* Opening Hours */}
                <div className="flex items-center group">
                  <Clock className="text-brand-gold mr-4 flex-shrink-0 w-5 h-5 group-hover:text-white transition-colors" />
                  <p className="text-gray-400 text-sm group-hover:text-white transition-colors">
@@ -123,13 +121,20 @@ const ContactFooter: React.FC<ContactFooterProps> = ({ contactInfo }) => {
                 <ChevronRight size={18} />
               </button>
             </div>
-            <p className="text-xs text-gray-600 mt-4">* We respect your privacy.</p>
+            
+            {/* Admin Login Link */}
+            <button 
+              onClick={onAdminLogin}
+              className="mt-6 flex items-center gap-2 text-[10px] text-gray-700 hover:text-brand-gold uppercase tracking-[0.2em] font-bold transition-colors"
+            >
+              <Lock size={10} /> Staff Login
+            </button>
           </div>
 
           {/* Dynamic Map Embed */}
           <div className="h-64 lg:h-auto min-h-[250px] w-full bg-gray-900 rounded-sm overflow-hidden shadow-2xl border border-gray-800 relative group">
             <iframe 
-              key={contactInfo.address} // Force re-render if address changes
+              key={contactInfo.address}
               src={mapUrl}
               width="100%" 
               height="100%" 
@@ -141,7 +146,6 @@ const ContactFooter: React.FC<ContactFooterProps> = ({ contactInfo }) => {
               className="w-full h-full grayscale hover:grayscale-0 transition-all duration-700 opacity-70 hover:opacity-100"
             ></iframe>
             
-            {/* Get Directions Button Overlay */}
             <a 
               href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(contactInfo.address)}`}
               target="_blank"

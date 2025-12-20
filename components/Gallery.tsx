@@ -1,5 +1,6 @@
+
 import React, { useState, useEffect } from 'react';
-import { GALLERY_SHEET_URL } from '../constants';
+import { GALLERY_SHEET_URL, getOptimizedImageURL } from '../constants';
 import { GalleryItem } from '../types';
 import { Loader2, X, ZoomIn, ChevronDown, ChevronUp } from 'lucide-react';
 
@@ -44,19 +45,6 @@ const Gallery: React.FC = () => {
 
     fetchGallery();
   }, []);
-
-  // Optimized Google Drive Image URL Converter (For Sheet Links)
-  const getOptimizedImageURL = (url: string) => {
-    if (!url) return '';
-    if (url.includes('drive.google.com') || url.includes('docs.google.com')) {
-      const idMatch = url.match(/\/d\/(.*?)\/|\/d\/(.*?)$|id=(.*?)(&|$)/);
-      const id = idMatch ? (idMatch[1] || idMatch[2] || idMatch[3]) : null;
-      if (id) {
-        return `https://lh3.googleusercontent.com/d/${id}=w1000`;
-      }
-    }
-    return url;
-  };
 
   const parseCSV = (csvText: string): GalleryItem[] => {
     const lines = csvText.split(/\r?\n/);
