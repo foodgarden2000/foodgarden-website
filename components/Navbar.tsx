@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { Menu as MenuIcon, X, Award, LogOut, User, LayoutDashboard, LogIn } from 'lucide-react';
+import { Menu as MenuIcon, X, Award, LogOut, User, LayoutDashboard, LogIn, Zap } from 'lucide-react';
 import { ContactInfo } from '../types';
 import { auth } from '../firebase';
 import { signOut, User as FirebaseUser } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
@@ -31,7 +31,6 @@ const Navbar: React.FC<NavbarProps> = ({ contactInfo, points, user, onNavigate, 
     
     if (currentView !== 'home') {
       onNavigate('home');
-      // Delay scroll until home view is rendered
       setTimeout(() => {
         const element = document.getElementById(href.replace('#', ''));
         if (element) {
@@ -103,13 +102,24 @@ const Navbar: React.FC<NavbarProps> = ({ contactInfo, points, user, onNavigate, 
                 </a>
               ))}
               
-              <button 
-                onClick={() => { onNavigate('dashboard'); setIsOpen(false); }}
-                className="px-10 py-4 bg-brand-gold text-brand-black font-bold uppercase tracking-widest text-sm rounded-full flex items-center gap-2"
-              >
-                {user ? <LayoutDashboard size={18} /> : <LogIn size={18} />}
-                {user ? "User Dashboard" : "Sign In / Register"}
-              </button>
+              <div className="flex flex-col gap-4 w-full px-12">
+                <button 
+                  onClick={() => { onNavigate('dashboard'); setIsOpen(false); }}
+                  className="w-full py-4 bg-brand-gold text-brand-black font-bold uppercase tracking-widest text-sm rounded-full flex items-center justify-center gap-2"
+                >
+                  {user ? <LayoutDashboard size={18} /> : <LogIn size={18} />}
+                  {user ? "Dashboard" : "Sign In"}
+                </button>
+                
+                {user && (
+                   <button 
+                     onClick={() => { onNavigate('dashboard'); setIsOpen(false); }}
+                     className="w-full py-4 border border-brand-red text-brand-red font-bold uppercase tracking-widest text-[10px] rounded-full flex items-center justify-center gap-2"
+                   >
+                     <Zap size={14} /> Upgrade to Premium
+                   </button>
+                )}
+              </div>
 
               {user && (
                 <button 

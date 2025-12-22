@@ -51,18 +51,21 @@ const Menu: React.FC<MenuProps> = ({ whatsappNumber, user, currentPoints }) => {
       setLoading(false);
     });
 
+    // Real-time user profile listener for role/subscription updates
+    let unsubProfile = () => {};
     if (user) {
-      getDoc(doc(db, "users", user.uid)).then(snap => {
+      unsubProfile = onSnapshot(doc(db, "users", user.uid), (snap) => {
         if (snap.exists()) setUserProfile(snap.data() as UserProfile);
       });
     }
 
-    return () => { unsubCats(); unsubMenu(); };
+    return () => { unsubCats(); unsubMenu(); unsubProfile(); };
   }, [user]);
 
   const calculatePotentialPoints = (priceStr: string, quantity: number) => {
     const cleanPrice = parseInt(priceStr.replace(/\D/g, '')) || 0;
     const total = cleanPrice * quantity;
+    // Premium Subscribers earn 15% points, others earn 10%
     const rate = userProfile?.role === 'subscriber' ? 0.15 : 0.10;
     return Math.floor(total * rate);
   };
@@ -190,7 +193,7 @@ const Menu: React.FC<MenuProps> = ({ whatsappNumber, user, currentPoints }) => {
                     </div>
                     <p className="text-gray-500 text-sm mb-8 flex-1 leading-relaxed">{item.description}</p>
                     <button onClick={() => { setSelectedOrderItem(item); setIsOrderModalOpen(true); }} className="w-full py-4 bg-brand-dark text-white rounded-lg font-bold uppercase text-xs tracking-widest hover:bg-brand-gold hover:text-brand-black transition-all shadow-md active:scale-95">
-                      {user ? 'Order & Earn Points' : 'Order Now'}
+                      {userProfile?.role === 'subscriber' ? 'Order (Premium Rate Enabled)' : user ? 'Order & Earn Points' : 'Order Now'}
                     </button>
                   </div>
                 </div>
@@ -222,7 +225,7 @@ const Menu: React.FC<MenuProps> = ({ whatsappNumber, user, currentPoints }) => {
                     key={type.id}
                     type="button"
                     onClick={() => setOrderFormData({...orderFormData, type: type.id as OrderType})}
-                    className={`flex flex-col items-center justify-center p-4 rounded-xl border transition-all ${orderFormData.type === type.id ? 'border-brand-gold bg-brand-gold/10 text-brand-black' : 'border-gray-100 text-gray-400 hover:bg-gray-50'}`}
+                    className={`flex flex-col items-center justify-center p-4 rounded-xl border transition-all ${orderFormData.type === type.id ? 'border-brand-gold bg-brand-gold/10 text-brand-gold' : 'border-gray-100 text-gray-400 hover:bg-gray-50'}`}
                   >
                     <type.icon size={20} className="mb-2" />
                     <span className="text-[10px] font-bold uppercase tracking-widest">{type.label}</span>
@@ -235,6 +238,7 @@ const Menu: React.FC<MenuProps> = ({ whatsappNumber, user, currentPoints }) => {
                   <div>
                     <span className="text-xs font-bold text-brand-black/60 uppercase tracking-widest block mb-1">Potential Rewards</span>
                     <span className="text-2xl font-display font-bold text-brand-red">+{calculatePotentialPoints(selectedOrderItem.price || "0", orderFormData.quantity)} Points</span>
+                    {userProfile?.role === 'subscriber' && <p className="text-[10px] text-brand-gold font-bold uppercase mt-1">15% Premium Rate Active</p>}
                   </div>
                   <Award size={32} className="text-brand-gold" />
                 </div>

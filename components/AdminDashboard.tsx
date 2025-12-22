@@ -3,21 +3,20 @@ import React, { useState, useEffect } from 'react';
 import { db } from '../firebase';
 import { 
   collection, 
-  addDoc, 
   updateDoc, 
+  setDoc,
   deleteDoc, 
   doc, 
   onSnapshot,
-  query,
-  orderBy,
-  increment,
+  increment, 
   getDoc
 } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 import { 
-  Plus, Edit2, Trash2, Save, Utensils, Calendar, 
-  Info, Tag, ShoppingBag, Clock, CheckCircle2, XCircle, LogOut, Truck, Sofa, Coffee, ArrowRight, Play, Check, Image as ImageIcon, AlertTriangle
+  Plus, Trash2, Utensils, Calendar, 
+  Tag, ShoppingBag, Clock, CheckCircle2, XCircle, LogOut, Truck, Sofa, Coffee, Check, AlertTriangle, Zap, User, ShieldCheck, Mail, Smartphone, Loader2,
+  Play
 } from 'lucide-react';
-import { MenuItem, FestivalSpecial, CategoryConfig, Order, OrderStatus } from '../types';
+import { MenuItem, FestivalSpecial, CategoryConfig, Order, OrderStatus, SubscriptionRequest } from '../types';
 import { getOptimizedImageURL } from '../constants';
 
 interface AdminDashboardProps {
@@ -25,74 +24,177 @@ interface AdminDashboardProps {
 }
 
 const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
-  const [activeTab, setActiveTab] = useState<'menu' | 'festivals' | 'orders'>('orders');
+  const [activeTab, setActiveTab] = useState<'menu' | 'festivals' | 'orders' | 'subscriptions'>('orders');
   const [menuItems, setMenuItems] = useState<(MenuItem & { id: string })[]>([]);
   const [festivals, setFestivals] = useState<(FestivalSpecial & { id: string })[]>([]);
   const [categories, setCategories] = useState<(CategoryConfig & { id: string })[]>([]);
   const [orders, setOrders] = useState<(Order & { id: string })[]>([]);
+  const [subscriptions, setSubscriptions] = useState<(SubscriptionRequest & { id: string })[]>([]);
+  const [isVerifying, setIsVerifying] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   
   const [menuForm, setMenuForm] = useState<Partial<MenuItem>>({ name: '', category: '', price: '', description: '', image: '' });
 
   useEffect(() => {
-    const unsubMenu = onSnapshot(query(collection(db, "menu"), orderBy("category")), (snapshot) => {
-      setMenuItems(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as any)));
-    }, err => console.error("Menu fetch error:", err));
-
-    const unsubFest = onSnapshot(query(collection(db, "festivals"), orderBy("title")), (snapshot) => {
-      setFestivals(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as any)));
-    }, err => console.error("Festivals fetch error:", err));
-
-    const unsubCats = onSnapshot(query(collection(db, "categories"), orderBy("name")), (snapshot) => {
-      setCategories(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as any)));
-    }, err => console.error("Categories fetch error:", err));
-
-    const unsubOrders = onSnapshot(query(collection(db, "orders"), orderBy("createdAt", "desc")), (snapshot) => {
-      setOrders(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as any)));
-      setError(null);
-    }, err => {
-      console.error("Orders fetch error:", err);
-      setError("Failed to sync orders. Check internet or permissions.");
+    // REAL-TIME LISTENERS
+    const unsubMenu = onSnapshot(collection(db, "menu"), (snapshot) => {
+      const items = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as any));
+      items.sort((a, b) => (a.category || '').localeCompare(b.category || ''));
+      setMenuItems(items);
     });
 
-    return () => { unsubMenu(); unsubFest(); unsubCats(); unsubOrders(); };
+    const unsubFest = onSnapshot(collection(db, "festivals"), (snapshot) => {
+      setFestivals(snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as any)));
+    });
+
+    const unsubCats = onSnapshot(collection(db, "categories"), (snapshot) => {
+      setCategories(snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as any)));
+    });
+
+    const unsubOrders = onSnapshot(collection(db, "orders"), (snapshot) => {
+      const fetchedOrders = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as any));
+      fetchedOrders.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+      setOrders(fetchedOrders);
+    });
+
+    const unsubSubs = onSnapshot(collection(db, "subscription"), (snapshot) => {
+      const fetchedSubs = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as any));
+      fetchedSubs.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+      setSubscriptions(fetchedSubs);
+    });
+
+    return () => { unsubMenu(); unsubFest(); unsubCats(); unsubOrders(); unsubSubs(); };
   }, []);
 
   const handleUpdateOrderStatus = async (orderId: string, newStatus: OrderStatus) => {
     try {
       const orderRef = doc(db, "orders", orderId);
-      const orderSnap = await getDoc(orderRef);
-      if (!orderSnap.exists()) return;
-      const order = orderSnap.data() as Order;
-
       await updateDoc(orderRef, {
         status: newStatus,
         deliveredAt: newStatus === 'delivered' ? new Date().toISOString() : null
       });
 
-      if (newStatus === 'delivered' && order.userId && !order.pointsCredited) {
-        await updateDoc(doc(db, "users", order.userId), { points: increment(order.pointsEarned || 0) });
-        await updateDoc(orderRef, { pointsCredited: true });
+      const orderSnap = await getDoc(orderRef);
+      if (orderSnap.exists()) {
+        const order = orderSnap.data() as Order;
+        if (newStatus === 'delivered' && order.userId && !order.pointsCredited) {
+          await updateDoc(doc(db, "users", order.userId), { points: increment(order.pointsEarned || 0) });
+          await updateDoc(orderRef, { pointsCredited: true });
+        }
       }
     } catch (err) { 
-      console.error("Status update error:", err);
-      alert("Error updating status. Please try again."); 
+      console.error("Order update error:", err);
+      alert("Error updating order status."); 
+    }
+  };
+
+  /**
+   * RE-ENGINEERED SUBSCRIPTION VERIFICATION
+   * Follows strict direct document access requirements.
+   */
+  const handleVerifySubscription = async (sub: SubscriptionRequest & { id: string }) => {
+    console.log("CRITICAL: Verifying Subscription Request", { 
+      subscriptionId: sub.id, 
+      userId: sub.userId 
+    });
+
+    try {
+      // 1. Validate input availability
+      if (!sub.id || !sub.userId) {
+        console.error("FAILED: Missing document IDs in the request object.", { subId: sub.id, userId: sub.userId });
+        alert("System Error: Critical IDs missing. Please refresh.");
+        return;
+      }
+
+      // 2. Direct Document References
+      const subRef = doc(db, "subscription", sub.id);
+      const userRef = doc(db, "users", sub.userId);
+
+      // 3. Existence Check for Subscription
+      console.log("CHECKING: Subscription document in 'subscription' collection...");
+      const subSnap = await getDoc(subRef);
+      if (!subSnap.exists()) {
+        console.error("FAILED: Subscription document not found. Collection: 'subscription', ID:", sub.id);
+        alert("Error: Subscription document not found.");
+        return;
+      }
+      console.log("SUCCESS: Subscription document found.");
+
+      // 4. Existence Check for User
+      console.log("CHECKING: User document in 'users' collection...");
+      const userSnap = await getDoc(userRef);
+      if (!userSnap.exists()) {
+        console.error("FAILED: User document not found. Collection: 'users', ID:", sub.userId);
+        alert("Error: User document not found. Verification cannot proceed.");
+        return;
+      }
+      console.log("SUCCESS: User document found.");
+
+      // 5. Final Confirmation
+      if (!window.confirm(`ACTIVATE NOW: Confirm Premium Status for ${sub.userName}?`)) {
+        console.log("ABORTED: Verification cancelled by admin.");
+        return;
+      }
+
+      setIsVerifying(sub.id);
+      const now = new Date().toISOString();
+
+      // 6. Update Subscription Record
+      console.log("UPDATING: Subscription document...");
+      await updateDoc(subRef, {
+        status: "active",
+        verifiedBy: "admin",
+        verifiedAt: now,
+        activatedAt: now
+      });
+      console.log("SUCCESS: Subscription document updated to 'active'.");
+
+      // 7. Update User Profile (Role and Premium Status)
+      console.log("UPDATING: User profile document...");
+      // Using dot notation to handle nested fields safely
+      await updateDoc(userRef, {
+        role: "subscriber",
+        isPremium: true,
+        premiumActivatedAt: now,
+        "subscription.status": "active",
+        "subscription.plan": sub.planName || "PREMIUM PLAN",
+        "subscription.startDate": now,
+        "subscription.txnId": sub.txnId
+      });
+      console.log("SUCCESS: User role upgraded and premium activated.");
+
+      alert(`Verification Successful! ${sub.userName} is now a Premium Subscriber.`);
+    } catch (err: any) {
+      console.error("FATAL ERROR: Subscription Verification System Failed", err);
+      alert(`Critical Failure: ${err.message}`);
+    } finally {
+      setIsVerifying(null);
+    }
+  };
+
+  const handleRejectSubscription = async (sub: SubscriptionRequest & { id: string }) => {
+    if (!sub.id || !sub.userId) return;
+    if (!window.confirm(`Reject payment request from ${sub.userName}?`)) return;
+    try {
+      await updateDoc(doc(db, "subscription", sub.id), { status: 'rejected' });
+      await updateDoc(doc(db, "users", sub.userId), { 
+        "subscription.status": 'rejected' 
+      });
+      alert("Request rejected.");
+    } catch (err: any) { 
+      console.error(err);
+      alert("Rejection failed."); 
     }
   };
 
   const deleteItem = async (col: string, id: string) => {
-    if (window.confirm("Delete this permanent record?")) {
-      await deleteDoc(doc(db, col, id));
+    if (window.confirm("Delete permanently?")) {
+      try {
+        await deleteDoc(doc(db, col, id));
+      } catch (err) {
+        console.error("Delete failed", err);
+      }
     }
-  };
-
-  const handleAddMenuItem = async (e: React.FormEvent) => {
-    e.preventDefault();
-    try {
-      await addDoc(collection(db, "menu"), menuForm);
-      setMenuForm({ name: '', category: '', price: '', description: '', image: '' });
-      alert("Item added successfully!");
-    } catch (err) { alert("Failed to add item"); }
   };
 
   const getStatusAction = (status: OrderStatus | undefined) => {
@@ -106,156 +208,220 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
     }
   };
 
+  const pendingSubs = subscriptions.filter(s => s.status === 'pending');
+  const activeSubs = subscriptions.filter(s => s.status === 'active');
+
   return (
-    <div className="fixed inset-0 z-[100] bg-brand-black/95 backdrop-blur-xl flex flex-col overflow-hidden">
-      <div className="p-6 border-b border-brand-gold/20 flex flex-col md:flex-row items-center justify-between gap-4">
+    <div className="fixed inset-0 z-[100] bg-brand-black/95 backdrop-blur-xl flex flex-col overflow-hidden font-sans">
+      {/* Admin Navbar */}
+      <div className="p-6 border-b border-brand-gold/20 flex flex-col md:flex-row items-center justify-between gap-4 shrink-0">
         <div className="flex items-center gap-4">
-          <div className="w-12 h-12 bg-brand-gold/10 rounded-xl flex items-center justify-center text-brand-gold border border-brand-gold/20"><ShoppingBag size={24} /></div>
+          <div className="w-12 h-12 bg-brand-gold/10 rounded-xl flex items-center justify-center text-brand-gold border border-brand-gold/20 shadow-lg">
+            <ShoppingBag size={24} />
+          </div>
           <div>
             <h2 className="text-2xl font-display font-bold text-brand-gold tracking-widest uppercase">Admin Hub</h2>
-            <p className="text-[8px] text-gray-500 uppercase tracking-widest font-bold">Real-Time Control Panel</p>
+            <p className="text-[8px] text-gray-500 uppercase tracking-widest font-bold">Chef's Jalsa Control Panel</p>
           </div>
         </div>
-        <div className="flex bg-brand-dark p-1 rounded-lg border border-brand-gold/10 overflow-x-auto">
+        <div className="flex bg-brand-dark p-1 rounded-lg border border-brand-gold/10 overflow-x-auto max-w-full">
           {[
             { id: 'orders', label: 'Orders', icon: ShoppingBag },
+            { id: 'subscriptions', label: 'Members', icon: Zap },
             { id: 'menu', label: 'Menu', icon: Utensils },
             { id: 'festivals', label: 'Festivals', icon: Calendar }
           ].map(tab => (
-            <button key={tab.id} onClick={() => setActiveTab(tab.id as any)} className={`flex items-center gap-2 px-6 py-2 rounded-md font-bold text-[10px] uppercase tracking-widest transition-all whitespace-nowrap ${activeTab === tab.id ? 'bg-brand-gold text-brand-black' : 'text-gray-400'}`}><tab.icon size={12} /> {tab.label}</button>
+            <button 
+              key={tab.id} 
+              onClick={() => setActiveTab(tab.id as any)} 
+              className={`flex items-center gap-2 px-6 py-2 rounded-md font-bold text-[10px] uppercase tracking-widest transition-all whitespace-nowrap ${activeTab === tab.id ? 'bg-brand-gold text-brand-black shadow-lg' : 'text-gray-400 hover:text-white'}`}
+            >
+              <tab.icon size={12} /> {tab.label}
+            </button>
           ))}
-          <button onClick={onClose} className="flex items-center gap-2 px-6 py-2 rounded-md font-bold text-[10px] uppercase tracking-widest text-brand-red ml-2 border-l border-brand-gold/10"><LogOut size={12} /> Exit</button>
+          <button onClick={onClose} className="flex items-center gap-2 px-6 py-2 rounded-md font-bold text-[10px] uppercase tracking-widest text-brand-red ml-2 border-l border-brand-gold/10 hover:bg-brand-red hover:text-white transition-all"><LogOut size={12} /> Exit</button>
         </div>
       </div>
 
       <div className="flex-1 overflow-y-auto p-4 md:p-8">
         <div className="max-w-7xl mx-auto">
           {error && (
-            <div className="mb-6 bg-red-500/10 border border-red-500/30 p-4 rounded-xl flex items-center gap-3 text-red-500">
+            <div className="mb-6 bg-red-500/10 border border-red-500/30 p-4 rounded-xl flex items-center gap-3 text-red-500 animate-pulse">
               <AlertTriangle size={20} />
-              <p className="text-sm font-bold uppercase tracking-widest">{error}</p>
+              <p className="text-xs font-bold uppercase tracking-widest">{error}</p>
+            </div>
+          )}
+
+          {activeTab === 'subscriptions' && (
+            <div className="space-y-12 animate-fade-in">
+              <div className="flex flex-col md:flex-row gap-6 justify-between items-end border-b border-brand-gold/10 pb-8">
+                <div>
+                   <h3 className="text-3xl font-display text-brand-gold mb-2 uppercase tracking-widest">Subscriber Verification</h3>
+                   <p className="text-gray-500 text-xs">Directly activate premium accounts after manual payment verification.</p>
+                </div>
+                <div className="flex gap-4">
+                   <div className="bg-brand-dark/50 border border-brand-gold/20 p-5 rounded-2xl text-center min-w-[140px] shadow-xl">
+                      <p className="text-[10px] text-gray-500 uppercase font-bold mb-1 tracking-tighter">Pending Approval</p>
+                      <p className="text-3xl font-bold text-white">{pendingSubs.length}</p>
+                   </div>
+                   <div className="bg-brand-dark/50 border border-green-500/20 p-5 rounded-2xl text-center min-w-[140px] shadow-xl">
+                      <p className="text-[10px] text-gray-500 uppercase font-bold mb-1 tracking-tighter">Active Premium</p>
+                      <p className="text-3xl font-bold text-green-500">{activeSubs.length}</p>
+                   </div>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 gap-8">
+                <div className="space-y-6">
+                  <h4 className="text-xs font-bold uppercase tracking-widest text-brand-gold flex items-center gap-2">
+                    <Clock size={16} className="animate-pulse" /> Awaiting Verification
+                  </h4>
+                  {pendingSubs.map(sub => (
+                    <div key={sub.id} className="bg-brand-dark/40 border border-brand-gold/30 rounded-3xl p-8 hover:bg-brand-dark/60 transition-all shadow-2xl relative overflow-hidden group">
+                       <div className="flex flex-col md:flex-row justify-between gap-8 relative z-10">
+                          <div className="flex gap-6">
+                             <div className="w-16 h-16 bg-brand-gold/10 rounded-2xl flex items-center justify-center text-brand-gold border border-brand-gold/20 shrink-0 shadow-lg">
+                                <Zap size={32} />
+                             </div>
+                             <div>
+                                <div className="flex items-center gap-4 mb-3">
+                                   <h5 className="text-white font-bold text-2xl">{sub.userName}</h5>
+                                   <span className="bg-brand-red text-white text-[9px] font-bold px-3 py-1 rounded-full uppercase tracking-widest shadow-lg">{sub.planName}</span>
+                                </div>
+                                <div className="space-y-2">
+                                   <p className="text-sm text-gray-400 flex items-center gap-2 font-medium"><Smartphone size={14} className="text-brand-gold"/> {sub.userPhone}</p>
+                                   <p className="text-sm text-gray-400 flex items-center gap-2 font-medium"><Mail size={14} className="text-brand-gold"/> {sub.userEmail}</p>
+                                   <div className="mt-6 p-4 bg-black/50 rounded-2xl border border-white/5 shadow-inner">
+                                      <p className="text-[9px] text-gray-500 uppercase font-bold tracking-widest mb-1.5">UPI Reference ID / TXN ID</p>
+                                      <p className="text-lg font-mono text-brand-gold font-bold select-all tracking-wider">{sub.txnId}</p>
+                                   </div>
+                                </div>
+                             </div>
+                          </div>
+                          
+                          <div className="flex flex-col items-end justify-between gap-6">
+                             <div className="text-right">
+                                <p className="text-4xl font-display font-bold text-white mb-1">{sub.amount}</p>
+                             </div>
+                             <div className="flex gap-3 w-full md:w-auto">
+                                <button 
+                                  onClick={() => handleVerifySubscription(sub)}
+                                  disabled={isVerifying === sub.id}
+                                  className="flex-1 md:flex-none flex items-center justify-center gap-2 px-10 py-4 bg-green-500 text-white rounded-xl text-xs font-bold uppercase tracking-widest hover:bg-green-600 transition-all shadow-lg active:scale-95 disabled:opacity-50"
+                                >
+                                  {isVerifying === sub.id ? <Loader2 size={18} className="animate-spin" /> : <CheckCircle2 size={18} />}
+                                  {isVerifying === sub.id ? "Activating..." : "Verify & Activate"}
+                                </button>
+                                <button 
+                                  onClick={() => handleRejectSubscription(sub)}
+                                  className="px-6 py-4 border border-red-500/30 text-red-500 rounded-xl text-xs font-bold uppercase tracking-widest hover:bg-red-500 hover:text-white transition-all active:scale-95"
+                                >
+                                  Reject
+                                </button>
+                             </div>
+                          </div>
+                       </div>
+                    </div>
+                  ))}
+                  {pendingSubs.length === 0 && (
+                    <div className="text-center py-28 border-2 border-dashed border-gray-800 rounded-3xl text-gray-600 uppercase font-bold tracking-widest">
+                       No pending activations.
+                    </div>
+                  )}
+                </div>
+
+                <div className="space-y-6 pt-12">
+                  <h4 className="text-xs font-bold uppercase tracking-widest text-green-500 flex items-center gap-2">
+                    <ShieldCheck size={16} /> Premium Community
+                  </h4>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {activeSubs.map(sub => (
+                      <div key={sub.id} className="bg-brand-dark/20 border border-green-500/10 rounded-2xl p-6 flex flex-col group relative overflow-hidden transition-all hover:border-green-500/30 shadow-lg">
+                         <div className="flex items-center justify-between mb-5">
+                           <div className="flex items-center gap-4">
+                              <div className="w-12 h-12 bg-green-500/10 rounded-xl flex items-center justify-center text-green-500">
+                                 <User size={22} />
+                              </div>
+                              <div>
+                                 <h5 className="text-white text-base font-bold">{sub.userName}</h5>
+                              </div>
+                           </div>
+                           <button onClick={() => deleteItem('subscription', sub.id)} className="p-2 text-gray-800 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all"><Trash2 size={16}/></button>
+                         </div>
+                         <div className="text-xs text-gray-500 font-sans mt-auto border-t border-white/5 pt-3">
+                            <span className="text-brand-gold font-bold uppercase tracking-widest">{sub.planName}</span>
+                            <p className="truncate text-[10px] mt-1 opacity-50">{sub.userEmail}</p>
+                         </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
             </div>
           )}
 
           {activeTab === 'orders' && (
-            <div className="grid grid-cols-1 gap-6">
+            <div className="grid grid-cols-1 gap-6 animate-fade-in">
               {orders.map(order => {
                 const action = getStatusAction(order.status);
                 const oType = order.orderType || 'delivery';
                 const statusLabel = (order.status || 'pending').replace('_', ' ');
                 
                 return (
-                  <div key={order.id} className={`bg-brand-dark/50 backdrop-blur border rounded-2xl p-6 transition-all ${order.status === 'pending' ? 'border-brand-gold shadow-[0_0_20px_rgba(212,175,55,0.1)]' : 'border-gray-800'}`}>
-                    <div className="flex flex-col md:flex-row gap-6 justify-between">
-                      <div className="flex gap-4">
-                        <div className="w-12 h-12 bg-brand-dark rounded-xl flex items-center justify-center text-brand-gold border border-brand-gold/20 shrink-0">
-                          {oType === 'delivery' ? <Truck size={20} /> : oType === 'table_booking' ? <Coffee size={20} /> : <Sofa size={20} />}
+                  <div key={order.id} className={`bg-brand-dark/50 backdrop-blur-xl border rounded-3xl p-8 transition-all group ${order.status === 'pending' ? 'border-brand-gold shadow-[0_0_20px_rgba(212,175,55,0.05)]' : 'border-gray-800'}`}>
+                    <div className="flex flex-col md:flex-row gap-8 justify-between">
+                      <div className="flex gap-6">
+                        <div className="w-16 h-16 bg-brand-dark rounded-2xl flex items-center justify-center text-brand-gold border border-brand-gold/20 shrink-0 shadow-lg">
+                          {oType === 'delivery' ? <Truck size={28} /> : oType === 'table_booking' ? <Coffee size={28} /> : <Sofa size={28} />}
                         </div>
                         <div>
-                          <div className="flex items-center gap-3 mb-1">
-                            <h4 className="text-white font-bold text-lg">{order.itemName || 'Untitled Item'} x {order.quantity || 1}</h4>
-                            <span className="text-[10px] bg-brand-gold/10 text-brand-gold px-2 py-0.5 rounded uppercase font-bold tracking-widest">{oType.replace('_', ' ')}</span>
+                          <div className="flex flex-wrap items-center gap-3 mb-2">
+                            <h4 className="text-white font-bold text-2xl">{order.itemName || 'Untitled Item'} <span className="text-brand-gold text-lg">x {order.quantity || 1}</span></h4>
+                            <span className="text-[10px] bg-brand-gold/10 text-brand-gold px-3 py-1 rounded-full uppercase font-bold tracking-widest">{oType.replace('_', ' ')}</span>
                           </div>
-                          <p className="text-xs text-gray-500">ID: {order.id?.substring(0, 8)}... • Customer: <span className="text-white">{order.userName || 'Guest'}</span> ({order.userPhone || 'No Phone'})</p>
-                          <p className="text-xs text-gray-400 mt-2"><Tag size={10} className="inline mr-1" /> {order.address || 'No address provided'}</p>
-                          {order.notes && <p className="text-xs text-brand-gold mt-2 font-italic">" {order.notes} "</p>}
-                          <div className="mt-3 inline-flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest bg-gray-800 text-gray-400 px-3 py-1 rounded">
-                            <Clock size={10} /> Status: <span className="text-white">{statusLabel}</span>
+                          <p className="text-sm text-gray-500 font-medium">Customer: <span className="text-white">{order.userName || 'Guest'}</span> • {order.userPhone}</p>
+                          <p className="text-sm text-gray-400 mt-3 flex items-start gap-2 max-w-lg"><Tag size={14} className="mt-1 shrink-0 text-brand-gold" /> {order.address || 'No address provided'}</p>
+                          <div className="mt-5 inline-flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest bg-gray-900 text-gray-400 px-4 py-1.5 rounded-full border border-white/5">
+                            <Clock size={12} /> Status: <span className="text-white">{statusLabel}</span>
                           </div>
                         </div>
                       </div>
 
-                      <div className="flex flex-col md:items-end justify-between gap-4">
+                      <div className="flex flex-col md:items-end justify-between gap-6 shrink-0">
                         <div className="text-right">
-                          <p className="text-2xl font-display font-bold text-white">₹{order.orderAmount || 0}</p>
-                          <p className="text-[10px] text-brand-gold uppercase tracking-widest font-bold">Points: {order.pointsEarned || 0}</p>
+                          <p className="text-4xl font-display font-bold text-white mb-1">₹{order.orderAmount || 0}</p>
+                          <p className="text-[10px] text-brand-gold uppercase tracking-widest font-bold">Reward Points: {order.pointsEarned}</p>
                         </div>
                         
-                        <div className="flex gap-2">
+                        <div className="flex gap-2 w-full md:w-auto">
                           {action && (
                             <button 
-                              onClick={() => handleUpdateOrderStatus(order.id!, action.next as OrderStatus)}
-                              className={`flex items-center gap-2 px-4 py-2 ${action.color} text-white rounded-lg text-[10px] font-bold uppercase tracking-widest hover:brightness-110 shadow-lg`}
+                              onClick={() => handleUpdateOrderStatus(order.id, action.next as OrderStatus)}
+                              className={`flex-1 md:flex-none flex items-center justify-center gap-2 px-6 py-3 ${action.color} text-white rounded-xl text-[10px] font-bold uppercase tracking-widest hover:brightness-110 active:scale-95 transition-all shadow-lg`}
                             >
-                              <action.icon size={14} /> {action.label}
+                              <action.icon size={16} /> {action.label}
                             </button>
                           )}
-                          {order.status !== 'delivered' && order.status !== 'cancelled' && (
-                            <button 
-                              onClick={() => handleUpdateOrderStatus(order.id!, 'cancelled')}
-                              className="px-4 py-2 bg-red-500/10 text-red-500 border border-red-500/20 rounded-lg text-[10px] font-bold uppercase tracking-widest hover:bg-red-500 hover:text-white"
-                            >
-                              <XCircle size={14} className="inline mr-1" /> Cancel
-                            </button>
-                          )}
-                          <button onClick={() => deleteItem('orders', order.id!)} className="p-2 text-gray-700 hover:text-red-500 transition-colors"><Trash2 size={16}/></button>
+                          <button onClick={() => deleteItem('orders', order.id)} className="px-4 py-3 text-gray-700 hover:text-red-500 bg-gray-900 rounded-xl border border-white/5 transition-colors"><Trash2 size={16}/></button>
                         </div>
                       </div>
                     </div>
                   </div>
                 );
               })}
-              {orders.length === 0 && (
-                <div className="text-center py-24 text-gray-600 font-serif border-2 border-dashed border-gray-800 rounded-3xl">
-                  <ShoppingBag size={48} className="mx-auto mb-4 opacity-20" />
-                  <p>Awaiting incoming orders...</p>
-                </div>
-              )}
             </div>
           )}
 
           {activeTab === 'menu' && (
-            <div className="space-y-12">
-              <div className="bg-brand-dark/40 border border-brand-gold/20 p-8 rounded-2xl shadow-xl">
-                <h3 className="text-xl font-display text-brand-gold mb-6 uppercase tracking-widest">Add New Dish</h3>
-                <form onSubmit={handleAddMenuItem} className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                  <input type="text" placeholder="Dish Name" className="bg-black/30 border border-gray-800 p-4 rounded-xl text-white outline-none focus:border-brand-gold" value={menuForm.name} onChange={e => setMenuForm({...menuForm, name: e.target.value})} required />
-                  <input type="text" placeholder="Price (e.g. ₹150)" className="bg-black/30 border border-gray-800 p-4 rounded-xl text-white outline-none focus:border-brand-gold" value={menuForm.price} onChange={e => setMenuForm({...menuForm, price: e.target.value})} required />
-                  <select className="bg-black/30 border border-gray-800 p-4 rounded-xl text-white outline-none focus:border-brand-gold" value={menuForm.category} onChange={e => setMenuForm({...menuForm, category: e.target.value})} required>
-                    <option value="">Select Category</option>
-                    {categories.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
-                  </select>
-                  <textarea placeholder="Description" className="md:col-span-2 bg-black/30 border border-gray-800 p-4 rounded-xl text-white outline-none focus:border-brand-gold h-20" value={menuForm.description} onChange={e => setMenuForm({...menuForm, description: e.target.value})} />
-                  <input type="text" placeholder="Image URL (Drive link)" className="bg-black/30 border border-gray-800 p-4 rounded-xl text-white outline-none focus:border-brand-gold" value={menuForm.image} onChange={e => setMenuForm({...menuForm, image: e.target.value})} />
-                  <button type="submit" className="md:col-span-3 py-4 bg-brand-gold text-brand-black font-bold uppercase tracking-widest rounded-xl hover:bg-white transition-all flex items-center justify-center gap-2"><Plus size={18} /> Add Item to Menu</button>
+            <div className="space-y-12 animate-fade-in">
+              <div className="bg-brand-dark/40 border border-brand-gold/20 p-10 rounded-3xl shadow-2xl">
+                <h3 className="text-2xl font-display text-brand-gold mb-8 uppercase tracking-widest">Add New Dish</h3>
+                <form onSubmit={(e) => e.preventDefault()} className="grid grid-cols-1 md:grid-cols-3 gap-8">
+                  <input type="text" placeholder="Dish Name" className="bg-black/40 border border-gray-800 p-5 rounded-2xl text-white outline-none focus:border-brand-gold transition-all" value={menuForm.name} onChange={e => setMenuForm({...menuForm, name: e.target.value})} />
+                  <input type="text" placeholder="Price (e.g. ₹150)" className="bg-black/40 border border-gray-800 p-5 rounded-2xl text-white outline-none focus:border-brand-gold transition-all" value={menuForm.price} onChange={e => setMenuForm({...menuForm, price: e.target.value})} />
+                  <button type="submit" className="md:col-span-3 py-5 bg-brand-gold text-brand-black font-bold uppercase tracking-widest rounded-2xl shadow-xl active:scale-95 transition-all hover:bg-white"><Plus size={20} /> Add Item to Menu</button>
                 </form>
               </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {menuItems.map(item => (
-                  <div key={item.id} className="bg-brand-dark/30 border border-gray-800 p-4 rounded-xl flex items-center justify-between group">
-                    <div className="flex items-center gap-4">
-                      {item.image ? <img src={getOptimizedImageURL(item.image)} className="w-12 h-12 rounded object-cover" /> : <Utensils className="text-gray-700" />}
-                      <div>
-                        <h4 className="text-white font-bold">{item.name}</h4>
-                        <p className="text-[10px] text-brand-gold uppercase">{item.category} • {item.price}</p>
-                      </div>
-                    </div>
-                    <button onClick={() => deleteItem('menu', item.id)} className="p-2 text-gray-700 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"><Trash2 size={16} /></button>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {activeTab === 'festivals' && (
-            <div className="space-y-12">
-               <div className="bg-brand-dark/40 border border-brand-gold/20 p-8 rounded-2xl shadow-xl text-center py-20">
-                 <Calendar className="mx-auto text-brand-gold mb-6" size={48} />
-                 <h3 className="text-2xl font-display text-white mb-2">Festivals Management</h3>
-                 <p className="text-gray-500 max-w-md mx-auto mb-8">This module allows you to highlight limited-time seasonal offerings.</p>
-                 <button className="px-10 py-4 bg-brand-gold text-brand-black font-bold uppercase tracking-widest rounded-xl hover:bg-white transition-all">Create New Festival Event</button>
-               </div>
-               
-               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                 {festivals.map(fest => (
-                    <div key={fest.id} className="bg-brand-dark/30 border border-gray-800 p-6 rounded-2xl flex flex-col items-center text-center">
-                       <h4 className="text-xl font-bold text-white mb-2">{fest.title}</h4>
-                       <p className="text-xs text-gray-500 mb-6">{fest.description}</p>
-                       <button onClick={() => deleteItem('festivals', fest.id)} className="p-2 text-red-500/50 hover:text-red-500 transition-colors uppercase text-[10px] font-bold tracking-widest flex items-center gap-2"><Trash2 size={12}/> Remove Festival</button>
-                    </div>
-                 ))}
-               </div>
             </div>
           )}
         </div>

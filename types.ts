@@ -46,6 +46,26 @@ export interface UserProfile {
   referralCode: string;
   referredBy: string | null;
   createdAt: string;
+  subscription?: {
+    status: 'active' | 'rejected' | 'pending';
+    plan: string;
+    startDate: string;
+    txnId?: string;
+  };
+}
+
+export interface SubscriptionRequest {
+  id?: string;
+  userId: string;
+  userName: string;
+  userEmail: string;
+  userPhone: string;
+  planName: string;
+  amount: string;
+  txnId: string;
+  status: 'pending' | 'active' | 'rejected';
+  createdAt: string;
+  activatedAt?: string;
 }
 
 export interface Referral {
