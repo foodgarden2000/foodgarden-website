@@ -46,7 +46,8 @@ const Menu: React.FC<MenuProps> = ({ whatsappNumber, user, currentPoints }) => {
     const unsubMenu = onSnapshot(qMenu, (snapshot) => {
       const fetchedItems = snapshot.docs.map(doc => doc.data() as MenuItem);
       setItems(fetchedItems);
-      const cats = Array.from(new Set(fetchedItems.map(i => i.category))).sort();
+      // Explicitly cast the unique categories to a string array to fix the TypeScript error.
+      const cats = Array.from(new Set(fetchedItems.map(i => i.category))).sort() as string[];
       setUniqueCategories(cats);
       setLoading(false);
     });

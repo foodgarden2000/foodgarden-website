@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { db } from '../firebase';
 import { 
   collection, 
@@ -9,12 +9,13 @@ import {
   doc, 
   onSnapshot,
   increment, 
-  getDoc
+  getDoc,
+  writeBatch
 } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 import { 
   Plus, Trash2, Utensils, Calendar, 
   Tag, ShoppingBag, Clock, CheckCircle2, XCircle, LogOut, Truck, Sofa, Coffee, Check, AlertTriangle, Zap, User, ShieldCheck, Mail, Smartphone, Loader2,
-  Play
+  Play, Volume2, VolumeX
 } from 'lucide-react';
 import { MenuItem, FestivalSpecial, CategoryConfig, Order, OrderStatus, SubscriptionRequest } from '../types';
 import { getOptimizedImageURL } from '../constants';
@@ -33,10 +34,22 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
   const [isVerifying, setIsVerifying] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   
+  // Sound Notification States
+  const [isSoundEnabled, setIsSoundEnabled] = useState(false);
+  const soundEnabledRef = useRef(false);
+  const isInitialLoad = useRef(true);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+
   const [menuForm, setMenuForm] = useState<Partial<MenuItem>>({ name: '', category: '', price: '', description: '', image: '' });
 
   useEffect(() => {
-    // REAL-TIME LISTENERS
+    // Initialize Notification Sound
+    audioRef.current = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3');
+    audioRef.current.preload = 'auto';
+
+    // Sync ref with state for use in the firestore callback closure
+    soundEnabledRef.current = isSoundEnabled;
+
     const unsubMenu = onSnapshot(collection(db, "menu"), (snapshot) => {
       const items = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as any));
       items.sort((a, b) => (a.category || '').localeCompare(b.category || ''));
@@ -52,9 +65,30 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
     });
 
     const unsubOrders = onSnapshot(collection(db, "orders"), (snapshot) => {
+      // 1. SOUND NOTIFICATION LOGIC
+      // onSnapshot fires with 'added' changes for initial docs, so we skip the very first load
+      if (!isInitialLoad.current && soundEnabledRef.current) {
+        snapshot.docChanges().forEach((change) => {
+          if (change.type === "added") {
+            const data = change.doc.data() as Order;
+            // Only alert for NEW pending orders
+            if (data.status === 'pending') {
+              console.log("🔔 New order received! Playing notification sound...");
+              audioRef.current?.play().catch(err => {
+                console.error("Audio playback failed (usually needs user interaction):", err);
+              });
+            }
+          }
+        });
+      }
+
+      // 2. STATE SYNCING
       const fetchedOrders = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as any));
       fetchedOrders.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
       setOrders(fetchedOrders);
+
+      // 3. COMPLETE INITIAL LOAD
+      isInitialLoad.current = false;
     });
 
     const unsubSubs = onSnapshot(collection(db, "subscription"), (snapshot) => {
@@ -63,8 +97,22 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
       setSubscriptions(fetchedSubs);
     });
 
-    return () => { unsubMenu(); unsubFest(); unsubCats(); unsubOrders(); unsubSubs(); };
-  }, []);
+    return () => { 
+      unsubMenu(); unsubFest(); unsubCats(); unsubOrders(); unsubSubs(); 
+    };
+  }, [isSoundEnabled]); // Re-register sound ref if state toggles
+
+  const toggleSound = () => {
+    const newState = !isSoundEnabled;
+    setIsSoundEnabled(newState);
+    // Primes the audio element so browsers allow automatic play later
+    if (newState && audioRef.current) {
+      audioRef.current.play().then(() => {
+        audioRef.current?.pause();
+        if (audioRef.current) audioRef.current.currentTime = 0;
+      }).catch(() => {});
+    }
+  };
 
   const handleUpdateOrderStatus = async (orderId: string, newStatus: OrderStatus) => {
     try {
@@ -88,10 +136,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
     }
   };
 
-  /**
-   * RE-ENGINEERED SUBSCRIPTION VERIFICATION
-   * Follows strict direct document access requirements.
-   */
   const handleVerifySubscription = async (sub: SubscriptionRequest & { id: string }) => {
     console.log("CRITICAL: Verifying Subscription Request", { 
       subscriptionId: sub.id, 
@@ -99,59 +143,38 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
     });
 
     try {
-      // 1. Validate input availability
       if (!sub.id || !sub.userId) {
-        console.error("FAILED: Missing document IDs in the request object.", { subId: sub.id, userId: sub.userId });
-        alert("System Error: Critical IDs missing. Please refresh.");
+        alert("System Error: Critical IDs missing.");
         return;
       }
 
-      // 2. Direct Document References
       const subRef = doc(db, "subscription", sub.id);
       const userRef = doc(db, "users", sub.userId);
 
-      // 3. Existence Check for Subscription
-      console.log("CHECKING: Subscription document in 'subscription' collection...");
       const subSnap = await getDoc(subRef);
       if (!subSnap.exists()) {
-        console.error("FAILED: Subscription document not found. Collection: 'subscription', ID:", sub.id);
         alert("Error: Subscription document not found.");
         return;
       }
-      console.log("SUCCESS: Subscription document found.");
 
-      // 4. Existence Check for User
-      console.log("CHECKING: User document in 'users' collection...");
       const userSnap = await getDoc(userRef);
       if (!userSnap.exists()) {
-        console.error("FAILED: User document not found. Collection: 'users', ID:", sub.userId);
-        alert("Error: User document not found. Verification cannot proceed.");
+        alert("Error: User document not found.");
         return;
       }
-      console.log("SUCCESS: User document found.");
 
-      // 5. Final Confirmation
-      if (!window.confirm(`ACTIVATE NOW: Confirm Premium Status for ${sub.userName}?`)) {
-        console.log("ABORTED: Verification cancelled by admin.");
-        return;
-      }
+      if (!window.confirm(`ACTIVATE NOW: Confirm Premium Status for ${sub.userName}?`)) return;
 
       setIsVerifying(sub.id);
       const now = new Date().toISOString();
 
-      // 6. Update Subscription Record
-      console.log("UPDATING: Subscription document...");
       await updateDoc(subRef, {
         status: "active",
         verifiedBy: "admin",
         verifiedAt: now,
         activatedAt: now
       });
-      console.log("SUCCESS: Subscription document updated to 'active'.");
 
-      // 7. Update User Profile (Role and Premium Status)
-      console.log("UPDATING: User profile document...");
-      // Using dot notation to handle nested fields safely
       await updateDoc(userRef, {
         role: "subscriber",
         isPremium: true,
@@ -161,11 +184,10 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
         "subscription.startDate": now,
         "subscription.txnId": sub.txnId
       });
-      console.log("SUCCESS: User role upgraded and premium activated.");
 
       alert(`Verification Successful! ${sub.userName} is now a Premium Subscriber.`);
     } catch (err: any) {
-      console.error("FATAL ERROR: Subscription Verification System Failed", err);
+      console.error("FATAL ERROR: Subscription Verification Failed", err);
       alert(`Critical Failure: ${err.message}`);
     } finally {
       setIsVerifying(null);
@@ -224,7 +246,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
             <p className="text-[8px] text-gray-500 uppercase tracking-widest font-bold">Chef's Jalsa Control Panel</p>
           </div>
         </div>
-        <div className="flex bg-brand-dark p-1 rounded-lg border border-brand-gold/10 overflow-x-auto max-w-full">
+
+        <div className="flex flex-wrap items-center justify-center bg-brand-dark p-1 rounded-lg border border-brand-gold/10 overflow-x-auto max-w-full">
           {[
             { id: 'orders', label: 'Orders', icon: ShoppingBag },
             { id: 'subscriptions', label: 'Members', icon: Zap },
@@ -239,19 +262,24 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
               <tab.icon size={12} /> {tab.label}
             </button>
           ))}
-          <button onClick={onClose} className="flex items-center gap-2 px-6 py-2 rounded-md font-bold text-[10px] uppercase tracking-widest text-brand-red ml-2 border-l border-brand-gold/10 hover:bg-brand-red hover:text-white transition-all"><LogOut size={12} /> Exit</button>
+
+          {/* Real-time Notification Toggle */}
+          <button 
+            onClick={toggleSound}
+            className={`flex items-center gap-2 px-6 py-2 rounded-md font-bold text-[10px] uppercase tracking-widest transition-all ml-2 border ${isSoundEnabled ? 'border-brand-gold text-brand-gold bg-brand-gold/10' : 'border-gray-800 text-gray-500 hover:text-white animate-pulse'}`}
+          >
+            {isSoundEnabled ? <Volume2 size={12} /> : <VolumeX size={12} />}
+            Sound: {isSoundEnabled ? 'ON' : 'OFF'}
+          </button>
+
+          <button onClick={onClose} className="flex items-center gap-2 px-6 py-2 rounded-md font-bold text-[10px] uppercase tracking-widest text-brand-red ml-2 border-l border-brand-gold/10 hover:bg-brand-red hover:text-white transition-all">
+            <LogOut size={12} /> Exit
+          </button>
         </div>
       </div>
 
       <div className="flex-1 overflow-y-auto p-4 md:p-8">
         <div className="max-w-7xl mx-auto">
-          {error && (
-            <div className="mb-6 bg-red-500/10 border border-red-500/30 p-4 rounded-xl flex items-center gap-3 text-red-500 animate-pulse">
-              <AlertTriangle size={20} />
-              <p className="text-xs font-bold uppercase tracking-widest">{error}</p>
-            </div>
-          )}
-
           {activeTab === 'subscriptions' && (
             <div className="space-y-12 animate-fade-in">
               <div className="flex flex-col md:flex-row gap-6 justify-between items-end border-b border-brand-gold/10 pb-8">
@@ -409,6 +437,12 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
                   </div>
                 );
               })}
+              {orders.length === 0 && (
+                <div className="text-center py-40 border-2 border-dashed border-gray-900 rounded-3xl text-gray-700">
+                  <ShoppingBag size={48} className="mx-auto mb-4 opacity-20" />
+                  <p className="uppercase tracking-[0.2em] font-bold text-xs">No orders in the system.</p>
+                </div>
+              )}
             </div>
           )}
 
