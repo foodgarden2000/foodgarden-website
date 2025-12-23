@@ -13,7 +13,7 @@ import {
 import { 
   Plus, Trash2, Utensils, Calendar, 
   Tag, ShoppingBag, Clock, CheckCircle2, XCircle, LogOut, Truck, Sofa, Coffee, Check, AlertTriangle, Zap, User, ShieldCheck, Mail, Smartphone, Loader2,
-  Play, Volume2, VolumeX, Ban, Filter, BarChart3, CalendarDays, ChevronRight, Star, X
+  Play, Volume2, VolumeX, Ban, Filter, BarChart3, CalendarDays, ChevronRight, Star, X, Coins
 } from 'lucide-react';
 import { MenuItem, FestivalSpecial, CategoryConfig, Order, OrderStatus, SubscriptionRequest, OrderType, UserCategory } from '../types';
 import { getOptimizedImageURL } from '../constants';
@@ -209,20 +209,34 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
   const handleUpdateOrderStatus = async (orderId: string, newStatus: OrderStatus) => {
     try {
       const orderRef = doc(db, "orders", orderId);
+      const orderSnap = await getDoc(orderRef);
+      if (!orderSnap.exists()) return;
+
+      const order = orderSnap.data() as Order;
+
+      // Point Deduction Logic for Point Orders
+      if (newStatus === 'delivered' && order.paymentMode === 'points' && !order.pointsDeducted && order.userId) {
+        console.log("Points Deducted:", order.pointsUsed, "for Order:", orderId);
+        await updateDoc(doc(db, "users", order.userId), {
+          points: increment(-(order.pointsUsed || 0))
+        });
+        await updateDoc(orderRef, { pointsDeducted: true });
+      }
+
+      // Point Earning Logic for Normal Orders
+      if (newStatus === 'delivered' && order.paymentMode !== 'points' && order.userId && !order.pointsCredited) {
+        await updateDoc(doc(db, "users", order.userId), { 
+          points: increment(order.pointsEarned || 0) 
+        });
+        await updateDoc(orderRef, { pointsCredited: true });
+      }
+
       await updateDoc(orderRef, {
         status: newStatus,
         deliveredAt: newStatus === 'delivered' ? new Date().toISOString() : null,
         updatedAt: new Date().toISOString()
       });
 
-      const orderSnap = await getDoc(orderRef);
-      if (orderSnap.exists()) {
-        const order = orderSnap.data() as Order;
-        if (newStatus === 'delivered' && order.userId && !order.pointsCredited) {
-          await updateDoc(doc(db, "users", order.userId), { points: increment(order.pointsEarned || 0) });
-          await updateDoc(orderRef, { pointsCredited: true });
-        }
-      }
     } catch (err) { 
       console.error("Order update error:", err);
       alert("Error updating order status."); 
@@ -593,6 +607,13 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
                                   {/* User Type Badge */}
                                   {getUserTypeBadge(order.userType)}
 
+                                  {/* Payment Mode Badge */}
+                                  {order.paymentMode === 'points' && (
+                                    <span className="flex items-center gap-1.5 bg-brand-black text-brand-gold border border-brand-gold/50 px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest shadow-lg">
+                                      POINT ORDER <Coins size={10} fill="currentColor" />
+                                    </span>
+                                  )}
+
                                   {order.status === 'rejected' && (
                                     <span className="text-[10px] bg-red-500/10 text-red-500 px-3 py-1 rounded-full uppercase font-bold tracking-widest flex items-center gap-1"><Ban size={10} /> Rejected</span>
                                   )}
@@ -632,8 +653,14 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
                               <div className="text-right">
                                 {order.orderType === 'delivery' ? (
                                   <>
-                                    <p className="text-4xl font-display font-bold text-white mb-1">₹{order.orderAmount || 0}</p>
-                                    <p className="text-[10px] text-brand-gold uppercase tracking-widest font-bold">Points: {order.pointsEarned}</p>
+                                    <p className="text-4xl font-display font-bold text-white mb-1">
+                                      {order.paymentMode === 'points' ? `${order.pointsUsed} pts` : `₹${order.orderAmount || 0}`}
+                                    </p>
+                                    {order.paymentMode === 'points' ? (
+                                      <p className="text-[10px] text-brand-gold uppercase tracking-widest font-bold">Equiv: ₹{order.amountEquivalent}</p>
+                                    ) : (
+                                      <p className="text-[10px] text-brand-gold uppercase tracking-widest font-bold">Earns: {order.pointsEarned}</p>
+                                    )}
                                   </>
                                 ) : (
                                   <div className="flex flex-col gap-1 items-end">

@@ -4,7 +4,7 @@ import { User as FirebaseUser, signOut } from "https://www.gstatic.com/firebasej
 import { auth, db } from '../firebase';
 import Auth from './Auth';
 import { 
-  ArrowLeft, Award, LogOut, User, ShoppingBag, Clock, Share2, Copy, Check, Gift, Truck, Coffee, Sofa, AlertCircle, Loader2, Smartphone, ShieldCheck, Zap, CreditCard, ExternalLink, ArrowRight, Ban, XCircle, Search, Tag
+  ArrowLeft, Award, LogOut, User, ShoppingBag, Clock, Share2, Copy, Check, Gift, Truck, Coffee, Sofa, AlertCircle, Loader2, Smartphone, ShieldCheck, Zap, CreditCard, ExternalLink, ArrowRight, Ban, XCircle, Search, Tag, Coins
 } from 'lucide-react';
 import { 
   doc, 
@@ -307,11 +307,23 @@ const Dashboard: React.FC<DashboardProps> = ({ user, points, onBack, adminMode, 
                       <span className={`text-[10px] uppercase font-bold px-3 py-1 rounded-full ${order.status.includes('cancelled') || order.status === 'rejected' ? 'bg-red-500 text-white shadow-md' : order.status === 'delivered' ? 'bg-green-500 text-white shadow-md' : 'bg-brand-gold/10 text-brand-gold border border-brand-gold/20'}`}>
                         {order.status.replace(/_/g, ' ')}
                       </span>
+                      {order.paymentMode === 'points' && (
+                        <span className="flex items-center gap-1 bg-brand-black text-brand-gold px-3 py-1 rounded-full text-[8px] font-bold uppercase tracking-widest shadow-md">
+                          Paid with Points <Coins size={10} fill="currentColor" />
+                        </span>
+                      )}
                     </div>
                     <div className="flex items-center flex-wrap gap-4 text-[10px] text-gray-500 font-bold uppercase tracking-widest">
                        <span className="flex items-center gap-1.5"><Clock size={12} className="text-brand-gold" /> {new Date(order.createdAt).toLocaleDateString()}</span>
                        <span className="flex items-center gap-1.5"><Tag size={12} className="text-brand-gold" /> {order.orderType.replace(/_/g, ' ')}</span>
                     </div>
+
+                    {order.paymentMode === 'points' && (
+                      <div className="mt-3 text-[10px] font-bold text-gray-500 uppercase tracking-widest flex items-center gap-2">
+                        <Coins size={12} className="text-brand-gold" />
+                        {order.status === 'delivered' ? 'Points Deducted' : 'Points deducted after successful delivery'}
+                      </div>
+                    )}
                     
                     {(order.status === 'rejected' || order.status.includes('cancelled')) && (order.rejectReason || order.cancelReason) && (
                       <div className="mt-4 p-4 bg-red-50 border border-red-100 rounded-xl flex items-start gap-3 shadow-inner">
@@ -335,8 +347,10 @@ const Dashboard: React.FC<DashboardProps> = ({ user, points, onBack, adminMode, 
                     )}
                   </div>
                   <div className="text-right shrink-0">
-                    <p className="text-3xl font-display font-bold text-brand-black">₹{order.orderAmount}</p>
-                    {order.status === 'delivered' && <p className="text-xs text-brand-gold font-bold">+{order.pointsEarned} Points Added</p>}
+                    <p className="text-3xl font-display font-bold text-brand-black">
+                      {order.paymentMode === 'points' ? `${order.pointsUsed} pts` : `₹${order.orderAmount}`}
+                    </p>
+                    {order.status === 'delivered' && order.paymentMode !== 'points' && <p className="text-xs text-brand-gold font-bold">+{order.pointsEarned} Points Added</p>}
                     {(order.status === 'rejected' || order.status.includes('cancelled')) && <p className="text-[10px] text-red-400 font-bold uppercase tracking-widest mt-1">Closed</p>}
                   </div>
                 </div>

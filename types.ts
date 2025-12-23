@@ -18,6 +18,7 @@ export interface CategoryConfig {
 export type OrderStatus = 'pending' | 'accepted' | 'preparing' | 'out_for_delivery' | 'delivered' | 'rejected' | 'cancelled_by_user' | 'cancelled_by_admin';
 export type OrderType = 'delivery' | 'table_booking' | 'cabin_booking';
 export type UserCategory = 'normal' | 'registered' | 'subscriber';
+export type PaymentMode = 'upi' | 'cash' | 'points';
 
 export interface Order {
   id?: string;
@@ -32,6 +33,10 @@ export interface Order {
   orderAmount: number;
   quantity: number;
   status: OrderStatus;
+  paymentMode: PaymentMode;
+  pointsUsed: number;
+  amountEquivalent: number;
+  pointsDeducted: boolean;
   pointsEarned: number;
   pointsCredited: boolean;
   createdAt: string;

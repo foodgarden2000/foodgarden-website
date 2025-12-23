@@ -3,8 +3,8 @@ import React, { useState, useEffect } from 'react';
 import { db } from '../firebase';
 import { collection, onSnapshot, query, orderBy, addDoc, doc, getDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 import { User } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
-import { Utensils, Loader2, ArrowLeft, X, Minus, Plus, Award, ChevronRight, Truck, Coffee, Sofa } from 'lucide-react';
-import { MenuItem, CategoryConfig, Order, OrderType, UserProfile, UserCategory } from '../types';
+import { Utensils, Loader2, ArrowLeft, X, Minus, Plus, Award, ChevronRight, Truck, Coffee, Sofa, Coins, CreditCard } from 'lucide-react';
+import { MenuItem, CategoryConfig, Order, OrderType, UserProfile, UserCategory, PaymentMode } from '../types';
 import { getOptimizedImageURL } from '../constants';
 
 interface MenuProps {
@@ -23,6 +23,7 @@ const Menu: React.FC<MenuProps> = ({ whatsappNumber, user, currentPoints, onNavi
   const [isOrderModalOpen, setIsOrderModalOpen] = useState(false);
   const [selectedOrderItem, setSelectedOrderItem] = useState<MenuItem | null>(null);
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
+  const [selectedPaymentMode, setSelectedPaymentMode] = useState<PaymentMode>('upi');
   
   const [orderFormData, setOrderFormData] = useState({
     name: '', 
@@ -77,6 +78,7 @@ const Menu: React.FC<MenuProps> = ({ whatsappNumber, user, currentPoints, onNavi
       return;
     }
     setSelectedOrderItem(item);
+    setSelectedPaymentMode('upi'); // Reset to default
     setIsOrderModalOpen(true);
   };
 
@@ -85,12 +87,18 @@ const Menu: React.FC<MenuProps> = ({ whatsappNumber, user, currentPoints, onNavi
     if (!selectedOrderItem || !user) return;
 
     const cleanPrice = parseInt(selectedOrderItem.price?.replace(/\D/g, '') || "0");
+    const totalAmount = cleanPrice * orderFormData.quantity;
     const potentialPoints = calculatePotentialPoints(selectedOrderItem.price || "0", orderFormData.quantity);
 
     // Identify User Type - Only registered/subscriber allowed
     const userType: UserCategory = userProfile?.role === 'subscriber' ? 'subscriber' : 'registered';
 
-    console.log("Submitting Order | User Type:", userType);
+    // Point Redemption Logic
+    const requiredPoints = totalAmount * 2;
+    if (selectedPaymentMode === 'points' && (userProfile?.points || 0) < requiredPoints) {
+      alert(`Insufficient points! You need ${requiredPoints} points but have ${userProfile?.points || 0}.`);
+      return;
+    }
 
     const orderData: Order = {
       userId: user.uid,
@@ -100,10 +108,14 @@ const Menu: React.FC<MenuProps> = ({ whatsappNumber, user, currentPoints, onNavi
       address: orderFormData.address,
       itemName: selectedOrderItem.name,
       orderType: orderFormData.type,
-      orderAmount: cleanPrice * orderFormData.quantity,
+      orderAmount: totalAmount,
       quantity: orderFormData.quantity,
       status: 'pending',
-      pointsEarned: potentialPoints,
+      paymentMode: selectedPaymentMode,
+      pointsUsed: selectedPaymentMode === 'points' ? requiredPoints : 0,
+      amountEquivalent: selectedPaymentMode === 'points' ? totalAmount : 0,
+      pointsDeducted: false,
+      pointsEarned: selectedPaymentMode === 'points' ? 0 : potentialPoints, // Don't earn points on point orders
       pointsCredited: false,
       notes: orderFormData.notes,
       createdAt: new Date().toISOString()
@@ -111,25 +123,35 @@ const Menu: React.FC<MenuProps> = ({ whatsappNumber, user, currentPoints, onNavi
 
     try {
       const docRef = await addDoc(collection(db, "orders"), orderData);
+      console.log("Order Created:", docRef.id, "Payment Mode:", selectedPaymentMode);
       
       const message = `*NEW ${orderFormData.type.replace('_', ' ').toUpperCase()} (${userType.toUpperCase()}) - Chef's Jalsa*\n` +
                       `*Order ID:* ${docRef.id}\n` +
                       `*Item:* ${selectedOrderItem.name}\n` +
                       `*Qty:* ${orderFormData.quantity}\n` +
-                      `*Total:* ₹${orderData.orderAmount}\n\n` +
-                      `*Customer Details:*\n👤 ${orderFormData.name}\n📞 ${orderFormData.phone}\n📍 ${orderFormData.address}\n` +
+                      `*Total:* ₹${orderData.orderAmount}\n` +
+                      `*Payment Mode:* ${selectedPaymentMode.toUpperCase()}\n` +
+                      (selectedPaymentMode === 'points' ? `*Points to Use:* ${orderData.pointsUsed}\n` : '') +
+                      `\n*Customer Details:*\n👤 ${orderFormData.name}\n📞 ${orderFormData.phone}\n📍 ${orderFormData.address}\n` +
                       (orderFormData.notes ? `📝 Notes: ${orderFormData.notes}\n` : '') +
-                      `\n_Points will be credited upon completion!_`;
+                      (selectedPaymentMode === 'points' ? `\n_Points will be deducted upon delivery!_` : `\n_Points will be credited upon completion!_`);
 
       window.open(`https://wa.me/${whatsappNumber}?text=${encodeURIComponent(message)}`, '_blank');
       
       setIsOrderModalOpen(false);
-      alert("Order submitted successfully! You can track live status in your dashboard.");
+      alert(selectedPaymentMode === 'points' 
+        ? "Order submitted via Points! Points will be deducted after successful delivery." 
+        : "Order submitted successfully! You can track live status in your dashboard.");
     } catch (err) { 
       console.error(err);
       alert("Error processing order. Please try again.");
     }
   };
+
+  const currentPrice = parseInt(selectedOrderItem?.price?.replace(/\D/g, '') || "0");
+  const totalAmount = currentPrice * orderFormData.quantity;
+  const requiredRedeemPoints = totalAmount * 2;
+  const hasEnoughPoints = (userProfile?.points || 0) >= requiredRedeemPoints;
 
   return (
     <section id="menu" className="py-24 bg-white min-h-screen relative overflow-hidden">
@@ -249,14 +271,54 @@ const Menu: React.FC<MenuProps> = ({ whatsappNumber, user, currentPoints, onNavi
                 ))}
               </div>
 
-              <div className="bg-brand-gold/10 p-5 rounded-xl border border-brand-gold/30 flex items-center justify-between">
-                <div>
-                  <span className="text-xs font-bold text-brand-black/60 uppercase tracking-widest block mb-1">Potential Rewards</span>
-                  <span className="text-2xl font-display font-bold text-brand-red">+{calculatePotentialPoints(selectedOrderItem.price || "0", orderFormData.quantity)} Points</span>
-                  {userProfile?.role === 'subscriber' && <p className="text-[10px] text-brand-gold font-bold uppercase mt-1">15% Premium Rate Active</p>}
+              {/* Payment Mode Selector */}
+              <div className="space-y-3">
+                <label className="text-[10px] text-gray-500 uppercase font-bold tracking-widest ml-1">Payment Method</label>
+                <div className="grid grid-cols-2 gap-4">
+                  <button
+                    type="button"
+                    onClick={() => setSelectedPaymentMode('upi')}
+                    className={`flex items-center gap-3 p-4 rounded-xl border transition-all ${selectedPaymentMode !== 'points' ? 'border-brand-gold bg-brand-gold/10 text-brand-gold' : 'border-gray-100 text-gray-400'}`}
+                  >
+                    <CreditCard size={18} />
+                    <span className="text-xs font-bold uppercase tracking-widest">Normal (Cash/UPI)</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedPaymentMode('points')}
+                    disabled={!hasEnoughPoints}
+                    className={`flex items-center gap-3 p-4 rounded-xl border transition-all ${!hasEnoughPoints ? 'opacity-40 cursor-not-allowed grayscale' : ''} ${selectedPaymentMode === 'points' ? 'border-brand-gold bg-brand-gold/10 text-brand-gold' : 'border-gray-100 text-gray-400'}`}
+                  >
+                    <Coins size={18} />
+                    <span className="text-xs font-bold uppercase tracking-widest">Redeem Points</span>
+                  </button>
                 </div>
-                <Award size={32} className="text-brand-gold" />
+                {!hasEnoughPoints && (
+                  <p className="text-[10px] text-red-500 font-bold uppercase tracking-tighter text-center">
+                    Insufficient points. You need {requiredRedeemPoints} points.
+                  </p>
+                )}
               </div>
+
+              {selectedPaymentMode === 'points' ? (
+                <div className="bg-brand-black p-5 rounded-xl border border-brand-gold/30 flex items-center justify-between">
+                  <div>
+                    <span className="text-xs font-bold text-brand-gold/60 uppercase tracking-widest block mb-1">Points to Deduct</span>
+                    <span className="text-2xl font-display font-bold text-brand-gold">-{requiredRedeemPoints} Points</span>
+                    <p className="text-[10px] text-gray-400 font-bold uppercase mt-1">Value: ₹{totalAmount}</p>
+                  </div>
+                  <Coins size={32} className="text-brand-gold" />
+                </div>
+              ) : (
+                <div className="bg-brand-gold/10 p-5 rounded-xl border border-brand-gold/30 flex items-center justify-between">
+                  <div>
+                    <span className="text-xs font-bold text-brand-black/60 uppercase tracking-widest block mb-1">Potential Rewards</span>
+                    <span className="text-2xl font-display font-bold text-brand-red">+{calculatePotentialPoints(selectedOrderItem.price || "0", orderFormData.quantity)} Points</span>
+                    {userProfile?.role === 'subscriber' && <p className="text-[10px] text-brand-gold font-bold uppercase mt-1">15% Premium Rate Active</p>}
+                  </div>
+                  <Award size={32} className="text-brand-gold" />
+                </div>
+              )}
               
               <div className="flex items-center justify-between border-b border-gray-100 pb-6">
                 <div className="flex-1">
@@ -283,7 +345,7 @@ const Menu: React.FC<MenuProps> = ({ whatsappNumber, user, currentPoints, onNavi
               </div>
 
               <button type="submit" className="w-full py-5 bg-brand-gold text-brand-black font-bold uppercase tracking-[0.2em] rounded-xl shadow-xl hover:bg-brand-black hover:text-white transition-all transform active:scale-95">
-                Place Real-Time Order
+                {selectedPaymentMode === 'points' ? 'Order Using Points' : 'Place Real-Time Order'}
               </button>
             </form>
           </div>
