@@ -10,12 +10,13 @@ import {
   increment, 
   getDoc,
   query,
-  where
+  where,
+  addDoc
 } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 import { 
   Plus, Trash2, Utensils, Calendar, 
   Tag, ShoppingBag, Clock, CheckCircle2, XCircle, LogOut, Truck, Sofa, Coffee, Check, AlertTriangle, Zap, User, ShieldCheck, Mail, Smartphone, Loader2,
-  Play, Volume2, VolumeX, Ban, Filter, BarChart3, CalendarDays, ChevronRight, Star, X, Coins, Wallet, CalendarCheck, Users, Phone, Search, CreditCard
+  Play, Volume2, VolumeX, Ban, Filter, BarChart3, CalendarDays, ChevronRight, Star, X, Coins, Wallet, CalendarCheck, Users, Phone, Search, CreditCard, Edit3, Image as ImageIcon, Eye, EyeOff
 } from 'lucide-react';
 import { MenuItem, FestivalSpecial, CategoryConfig, Order, OrderStatus, SubscriptionRequest, OrderType, UserCategory, EventBooking, UserProfile } from '../types';
 import { getOptimizedImageURL } from '../constants';
@@ -33,33 +34,44 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
   const [activeOrderCategory, setActiveOrderCategory] = useState<OrderCategory>('delivery');
   const [userTypeFilter, setUserTypeFilter] = useState<UserTypeFilter>('all');
   
-  // Subscription management states
-  const [subView, setSubView] = useState<'requests' | 'active'>('requests');
+  // Menu Management States
+  const [menuItems, setMenuItems] = useState<(MenuItem & { id: string })[]>([]);
+  const [isMenuFormOpen, setIsMenuFormOpen] = useState(false);
+  const [editingMenuItem, setEditingMenuItem] = useState<(MenuItem & { id: string }) | null>(null);
+  const [menuSearch, setMenuSearch] = useState('');
+  const [menuForm, setMenuForm] = useState<Partial<MenuItem>>({
+    itemName: '',
+    priceNum: 0,
+    category: '',
+    categoryType: 'Veg',
+    description: '',
+    backgroundImageUrl: '',
+    isAvailable: true,
+    isRecommended: false,
+    isNewItem: false
+  });
+
   const [subscriptions, setSubscriptions] = useState<(SubscriptionRequest & { id: string })[]>([]);
+  const [subView, setSubView] = useState<'requests' | 'active'>('requests');
   const [isProcessingSub, setIsProcessingSub] = useState<string | null>(null);
   const [rejectingSub, setRejectingSub] = useState<string | null>(null);
   const [rejectReason, setRejectReason] = useState('');
 
-  const [menuItems, setMenuItems] = useState<(MenuItem & { id: string })[]>([]);
   const [festivals, setFestivals] = useState<(FestivalSpecial & { id: string })[]>([]);
   const [categories, setCategories] = useState<(CategoryConfig & { id: string })[]>([]);
   const [orders, setOrders] = useState<(Order & { id: string })[]>([]);
   const [eventBookings, setEventBookings] = useState<(EventBooking & { id: string })[]>([]);
-  // Fix: Properly type allUsers state as Record of UserProfile
   const [allUsers, setAllUsers] = useState<Record<string, UserProfile>>({});
   
-  // Filtering & Analytics State
   const [timeFilter, setTimeFilter] = useState<TimeFilter>('month');
   const [customStartDate, setCustomStartDate] = useState('');
   const [customEndDate, setCustomEndDate] = useState('');
 
-  // Rejection/Cancellation Modal State
   const [actioningOrder, setActioningOrder] = useState<{id: string, action: 'reject' | 'cancel'} | null>(null);
   const [actioningBooking, setActioningBooking] = useState<{id: string, action: 'reject'} | null>(null);
   const [actionReason, setActionReason] = useState('');
   const [customActionReason, setCustomActionReason] = useState('');
 
-  // Sound Notification States
   const [isSoundEnabled, setIsSoundEnabled] = useState(false);
   const soundEnabledRef = useRef(false);
   
@@ -93,7 +105,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
     });
 
     const unsubUsers = onSnapshot(collection(db, "users"), (snapshot) => {
-      // Fix: Properly type userMap as Record of UserProfile
       const userMap: Record<string, UserProfile> = {};
       snapshot.docs.forEach(doc => { userMap[doc.id] = doc.data() as UserProfile; });
       setAllUsers(userMap);
@@ -134,68 +145,93 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
     };
   }, [isSoundEnabled]);
 
+  // Menu Helper Functions
+  const handleSaveMenuItem = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!menuForm.itemName || !menuForm.priceNum || !menuForm.category || !menuForm.backgroundImageUrl) {
+      alert("Please fill all required fields correctly.");
+      return;
+    }
+
+    try {
+      const data = {
+        ...menuForm,
+        name: menuForm.itemName, // Backward compatibility
+        price: `₹${menuForm.priceNum}`, // Backward compatibility
+        updatedAt: new Date().toISOString()
+      };
+
+      if (editingMenuItem) {
+        await updateDoc(doc(db, "menu", editingMenuItem.id), data);
+        console.log("Menu item updated:", menuForm.itemName);
+      } else {
+        await addDoc(collection(db, "menu"), {
+          ...data,
+          createdAt: new Date().toISOString()
+        });
+        console.log("Menu item added:", menuForm.itemName);
+      }
+
+      setIsMenuFormOpen(false);
+      setEditingMenuItem(null);
+      setMenuForm({
+        itemName: '',
+        priceNum: 0,
+        category: '',
+        categoryType: 'Veg',
+        description: '',
+        backgroundImageUrl: '',
+        isAvailable: true,
+        isRecommended: false,
+        isNewItem: false
+      });
+    } catch (err) {
+      console.error(err);
+      alert("Error saving menu item.");
+    }
+  };
+
+  const handleToggleMenuField = async (itemId: string, field: keyof MenuItem, currentVal: boolean) => {
+    try {
+      await updateDoc(doc(db, "menu", itemId), { [field]: !currentVal });
+      console.log(`Menu ${field} changed:`, itemId);
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const startEditMenu = (item: MenuItem & { id: string }) => {
+    setEditingMenuItem(item);
+    setMenuForm({
+      itemName: item.itemName || item.name,
+      priceNum: item.priceNum || parseInt(item.price?.replace(/\D/g, '') || '0'),
+      category: item.category,
+      categoryType: item.categoryType || (item.isVegetarian ? 'Veg' : 'Special'),
+      description: item.description,
+      backgroundImageUrl: item.backgroundImageUrl || item.image,
+      isAvailable: item.isAvailable !== undefined ? item.isAvailable : true,
+      isRecommended: item.isRecommended || false,
+      isNewItem: item.isNewItem || false
+    });
+    setIsMenuFormOpen(true);
+  };
+
   const handleApproveSub = async (sub: SubscriptionRequest & { id: string }) => {
     if (!window.confirm(`APPROVE Premium Status for ${sub.userName}?`)) return;
     setIsProcessingSub(sub.id);
     try {
       const now = new Date();
       const nowISO = now.toISOString();
-      
       let expiryDate: string | null = null;
       if (sub.planType === 'yearly') {
         const expiry = new Date(now);
         expiry.setDate(expiry.getDate() + 365);
         expiryDate = expiry.toISOString();
       }
-
-      await updateDoc(doc(db, "subscription", sub.id), {
-        status: 'approved',
-        updatedAt: nowISO,
-        expiryDate: expiryDate,
-        isExpired: false
-      });
-
-      await updateDoc(doc(db, "users", sub.userId), {
-        role: 'subscriber',
-        'subscription.status': 'active',
-        'subscription.plan': sub.planType,
-        'subscription.startDate': nowISO,
-        'subscription.expiryDate': expiryDate,
-        'subscription.isExpired': false,
-        'subscription.transactionId': sub.transactionId
-      });
-
-      console.log("Subscription approved:", sub.userId);
-      alert("Subscription approved successfully.");
-    } catch (err) {
-      console.error(err);
-      alert("Approval failed.");
-    } finally {
-      setIsProcessingSub(null);
-    }
-  };
-
-  const handleRejectSub = async () => {
-    if (!rejectingSub || !rejectReason) return;
-    setIsProcessingSub(rejectingSub);
-    try {
-      const sub = subscriptions.find(s => s.id === rejectingSub);
-      if (!sub) return;
-      
-      await updateDoc(doc(db, "subscription", rejectingSub), {
-        status: 'rejected',
-        adminReason: rejectReason,
-        updatedAt: new Date().toISOString()
-      });
-      console.log("Subscription rejected:", sub.userId);
-      alert("Subscription rejected.");
-      setRejectingSub(null);
-      setRejectReason('');
-    } catch (err) {
-      alert("Rejection failed.");
-    } finally {
-      setIsProcessingSub(null);
-    }
+      await updateDoc(doc(db, "subscription", sub.id), { status: 'approved', updatedAt: nowISO, expiryDate: expiryDate, isExpired: false });
+      await updateDoc(doc(db, "users", sub.userId), { role: 'subscriber', 'subscription.status': 'active', 'subscription.plan': sub.planType, 'subscription.startDate': nowISO, 'subscription.expiryDate': expiryDate, 'subscription.isExpired': false, 'subscription.transactionId': sub.transactionId });
+      alert("Subscription approved.");
+    } catch (err) { alert("Approval failed."); } finally { setIsProcessingSub(null); }
   };
 
   const analyticsData = useMemo(() => {
@@ -216,39 +252,13 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
       return d >= startDate && d <= endDate;
     });
 
-    const filteredBookings = eventBookings.filter(b => {
-      const d = new Date(b.createdAt);
-      return d >= startDate && d <= endDate;
-    });
-
     const calculateStats = (type: OrderType) => {
       const typeFiltered = filtered.filter(o => o.orderType === type);
-      return {
-        total: typeFiltered.length,
-        accepted: typeFiltered.filter(o => o.status === 'accepted').length,
-        rejected: typeFiltered.filter(o => o.status === 'rejected').length,
-        cancelled: typeFiltered.filter(o => o.status === 'cancelled_by_user' || o.status === 'cancelled_by_admin').length,
-        completed: typeFiltered.filter(o => o.status === 'delivered').length,
-        revenue: typeFiltered.reduce((acc, o) => acc + (o.status === 'delivered' ? (o.orderAmount || 0) : 0), 0)
-      };
+      return { total: typeFiltered.length, accepted: typeFiltered.filter(o => o.status === 'accepted').length, rejected: typeFiltered.filter(o => o.status === 'rejected').length, revenue: typeFiltered.reduce((acc, o) => acc + (o.status === 'delivered' ? (o.orderAmount || 0) : 0), 0) };
     };
 
-    return {
-      filtered,
-      filteredBookings,
-      delivery: calculateStats('delivery'),
-      table: calculateStats('table_booking'),
-      cabin: calculateStats('cabin_booking'),
-      events: {
-        total: filteredBookings.length,
-        pending: filteredBookings.filter(b => b.status === 'pending').length,
-        accepted: filteredBookings.filter(b => b.status === 'accepted').length,
-        rejected: filteredBookings.filter(b => b.status === 'rejected' || b.status === 'cancelled_by_user').length
-      }
-    };
-  }, [orders, eventBookings, timeFilter, customStartDate, customEndDate]);
-
-  const activeStats = activeOrderCategory === 'event_booking' ? analyticsData.events : analyticsData[activeOrderCategory === 'delivery' ? 'delivery' : activeOrderCategory === 'table_booking' ? 'table' : 'cabin'];
+    return { delivery: calculateStats('delivery'), table: calculateStats('table_booking'), cabin: calculateStats('cabin_booking') };
+  }, [orders, timeFilter, customStartDate, customEndDate]);
 
   const toggleSound = () => setIsSoundEnabled(!isSoundEnabled);
 
@@ -270,44 +280,12 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
     } catch (err) { alert("Error updating order status."); }
   };
 
-  const handleBookingAction = async (bookingId: string, status: 'accepted' | 'rejected') => {
-    if (status === 'rejected') {
-      setActioningBooking({ id: bookingId, action: 'reject' });
-      return;
-    }
-    try {
-      await updateDoc(doc(db, "eventBookings", bookingId), {
-        status: 'accepted',
-        updatedAt: new Date().toISOString()
-      });
-      alert("Booking accepted.");
-    } catch (err) { alert("Failed to update booking."); }
-  };
-
-  const handleOrderAction = async () => {
-    if (!actioningOrder) return;
-    const reason = actionReason === 'Other' ? customActionReason : actionReason;
-    if (!reason) { alert("Please provide a reason."); return; }
-    try {
-      const orderRef = doc(db, "orders", actioningOrder.id);
-      const updateData: any = { status: actioningOrder.action === 'reject' ? 'rejected' : 'cancelled_by_admin', updatedAt: new Date().toISOString() };
-      if (actioningOrder.action === 'reject') updateData.rejectReason = reason;
-      else { updateData.cancelReason = reason; updateData.cancelledBy = 'admin'; }
-      await updateDoc(orderRef, updateData);
-      alert(`Order ${actioningOrder.action} successfully.`);
-      setActioningOrder(null);
-      setActionReason('');
-    } catch (err) { alert("Failed to process action."); }
-  };
-
   const deleteItem = async (collectionName: string, id: string) => {
     if (!window.confirm("Are you sure you want to delete this?")) return;
     try {
       await deleteDoc(doc(db, collectionName, id));
       alert("Deleted successfully.");
-    } catch (err) {
-      alert("Failed to delete.");
-    }
+    } catch (err) { alert("Failed to delete."); }
   };
 
   return (
@@ -336,6 +314,114 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
 
       <div className="flex-1 overflow-y-auto p-4 md:p-8">
         <div className="max-w-7xl mx-auto">
+          {activeTab === 'menu' && (
+            <div className="animate-fade-in space-y-8">
+              <div className="flex flex-col md:flex-row justify-between items-center gap-6 bg-brand-dark/40 border border-brand-gold/10 p-6 rounded-3xl">
+                <div className="flex items-center gap-6">
+                  <div className="p-3 bg-brand-gold/10 rounded-xl text-brand-gold"><Utensils size={24} /></div>
+                  <div>
+                    <h3 className="text-xl font-display text-white uppercase tracking-widest">Menu Management</h3>
+                    <p className="text-[10px] text-gray-500 uppercase font-bold tracking-widest">Organize items and promotional status</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-4 w-full md:w-auto">
+                   <div className="relative flex-1 md:w-64">
+                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" size={14} />
+                     <input 
+                       type="text" 
+                       placeholder="Search items..." 
+                       value={menuSearch}
+                       onChange={(e) => setMenuSearch(e.target.value)}
+                       className="w-full bg-black/40 border border-gray-700 rounded-lg py-2 pl-10 pr-4 text-xs text-white focus:border-brand-gold outline-none"
+                     />
+                   </div>
+                   <button 
+                     onClick={() => { setEditingMenuItem(null); setMenuForm({ itemName: '', priceNum: 0, category: '', categoryType: 'Veg', description: '', backgroundImageUrl: '', isAvailable: true, isRecommended: false, isNewItem: false }); setIsMenuFormOpen(true); }}
+                     className="px-6 py-2.5 bg-brand-gold text-brand-black rounded-lg font-bold text-[10px] uppercase tracking-widest flex items-center gap-2 hover:bg-white transition-all whitespace-nowrap"
+                   >
+                     <Plus size={14} /> Add Item
+                   </button>
+                </div>
+              </div>
+
+              <div className="bg-brand-dark/40 border border-brand-gold/10 rounded-3xl overflow-hidden shadow-2xl">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left">
+                    <thead>
+                      <tr className="bg-black/50 text-[10px] text-gray-500 uppercase font-bold tracking-[0.2em] border-b border-white/5">
+                        <th className="px-8 py-5">Item Details</th>
+                        <th className="px-8 py-5">Category & Type</th>
+                        <th className="px-8 py-5 text-center">Status Toggles</th>
+                        <th className="px-8 py-5 text-right">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-white/5">
+                      {menuItems.filter(item => (item.itemName || item.name).toLowerCase().includes(menuSearch.toLowerCase())).map(item => (
+                        <tr key={item.id} className="hover:bg-white/[0.02] transition-colors group">
+                          <td className="px-8 py-6">
+                            <div className="flex items-center gap-4">
+                              <div className="w-12 h-12 rounded-lg overflow-hidden border border-white/5 bg-gray-900 flex items-center justify-center text-gray-700">
+                                {item.backgroundImageUrl || item.image ? (
+                                  <img src={getOptimizedImageURL(item.backgroundImageUrl || item.image || '')} className="w-full h-full object-cover" alt="" />
+                                ) : <ImageIcon size={20} />}
+                              </div>
+                              <div>
+                                <h4 className="text-white font-bold text-sm">{item.itemName || item.name}</h4>
+                                <p className="text-brand-gold font-bold text-xs">{item.priceNum ? `₹${item.priceNum}` : item.price}</p>
+                              </div>
+                            </div>
+                          </td>
+                          <td className="px-8 py-6">
+                            <div className="flex flex-col gap-1">
+                              <span className="text-gray-300 text-[10px] font-bold uppercase tracking-widest">{item.category}</span>
+                              <span className={`text-[8px] font-bold uppercase px-2 py-0.5 rounded-full inline-block w-fit ${item.categoryType === 'Veg' ? 'bg-green-500/20 text-green-500 border border-green-500/30' : 'bg-red-500/20 text-red-500 border border-red-500/30'}`}>
+                                {item.categoryType || (item.isVegetarian ? 'Veg' : 'Special')}
+                              </span>
+                            </div>
+                          </td>
+                          <td className="px-8 py-6">
+                            <div className="flex items-center justify-center gap-4">
+                              <button 
+                                onClick={() => handleToggleMenuField(item.id, 'isAvailable', item.isAvailable !== undefined ? item.isAvailable : true)}
+                                className={`flex flex-col items-center gap-1 group/btn ${item.isAvailable === false ? 'text-gray-600' : 'text-green-500'}`}
+                                title="Availability"
+                              >
+                                {item.isAvailable === false ? <EyeOff size={16} /> : <Eye size={16} />}
+                                <span className="text-[7px] font-bold uppercase">Live</span>
+                              </button>
+                              <button 
+                                onClick={() => handleToggleMenuField(item.id, 'isRecommended', !!item.isRecommended)}
+                                className={`flex flex-col items-center gap-1 ${item.isRecommended ? 'text-brand-gold' : 'text-gray-600'}`}
+                                title="Recommend"
+                              >
+                                <Star size={16} fill={item.isRecommended ? "currentColor" : "none"} />
+                                <span className="text-[7px] font-bold uppercase">Star</span>
+                              </button>
+                              <button 
+                                onClick={() => handleToggleMenuField(item.id, 'isNewItem', !!item.isNewItem)}
+                                className={`flex flex-col items-center gap-1 ${item.isNewItem ? 'text-blue-500' : 'text-gray-600'}`}
+                                title="New Item"
+                              >
+                                <Zap size={16} fill={item.isNewItem ? "currentColor" : "none"} />
+                                <span className="text-[7px] font-bold uppercase">New</span>
+                              </button>
+                            </div>
+                          </td>
+                          <td className="px-8 py-6 text-right">
+                            <div className="flex justify-end gap-2">
+                              <button onClick={() => startEditMenu(item)} className="p-2 text-gray-500 hover:text-brand-gold transition-colors"><Edit3 size={16} /></button>
+                              <button onClick={() => deleteItem('menu', item.id)} className="p-2 text-gray-500 hover:text-red-500 transition-colors"><Trash2 size={16} /></button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          )}
+
           {activeTab === 'orders' && (
             <div className="animate-fade-in space-y-10">
               <div className="flex flex-col lg:flex-row justify-between items-center gap-6 bg-brand-dark/40 border border-brand-gold/10 p-6 rounded-3xl">
@@ -375,7 +461,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
 
               <div className="grid grid-cols-1 gap-6 pt-8 border-t border-brand-gold/10">
                 {activeOrderCategory === 'event_booking' ? (
-                  analyticsData.filteredBookings.map(booking => (
+                  eventBookings.map(booking => (
                     <div key={booking.id} className="bg-brand-dark/50 border border-gray-800 rounded-3xl p-8 transition-all hover:border-brand-gold/30">
                        <div className="flex flex-col md:flex-row gap-8 justify-between">
                           <div className="flex gap-6">
@@ -389,16 +475,13 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
                              </div>
                           </div>
                           <div className="flex gap-2 items-center">
-                             {booking.status === 'pending' && (
-                               <button onClick={() => handleBookingAction(booking.id!, 'accepted')} className="px-6 py-3 bg-green-500 text-white rounded-xl text-[10px] font-bold uppercase tracking-widest">Accept</button>
-                             )}
                              <a href={`tel:${booking.phone}`} className="p-3 bg-gray-900 border border-white/5 rounded-xl text-brand-gold"><Phone size={18} /></a>
                           </div>
                        </div>
                     </div>
                   ))
                 ) : (
-                  analyticsData.filtered.filter(o => o.orderType === activeOrderCategory && (userTypeFilter === 'all' || o.userType === userTypeFilter)).map(order => (
+                  orders.filter(o => o.orderType === activeOrderCategory && (userTypeFilter === 'all' || o.userType === userTypeFilter)).map(order => (
                     <div key={order.id} className="bg-brand-dark/50 border border-gray-800 rounded-3xl p-8">
                       <div className="flex flex-col md:flex-row gap-8 justify-between">
                         <div className="flex gap-6">
@@ -435,200 +518,105 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
                   <button onClick={() => setSubView('active')} className={`px-6 py-2 rounded-lg text-[10px] font-bold uppercase tracking-widest transition-all ${subView === 'active' ? 'bg-brand-gold text-brand-black shadow-lg' : 'text-gray-500'}`}>Active Members</button>
                 </div>
               </div>
-
-              {subView === 'requests' ? (
-                <div className="grid grid-cols-1 gap-6">
-                  {subscriptions.filter(s => s.status === 'pending').length === 0 ? (
-                    <div className="text-center py-20 bg-brand-dark/20 rounded-3xl border border-dashed border-gray-800">
-                      <CreditCard size={48} className="text-gray-800 mx-auto mb-4" />
-                      <p className="text-gray-500 font-serif italic text-lg">No pending subscription requests.</p>
-                    </div>
-                  ) : (
-                    subscriptions.filter(s => s.status === 'pending').map(sub => (
-                      <div key={sub.id} className="bg-brand-dark/40 border border-brand-gold/30 rounded-3xl p-8 hover:bg-brand-dark/60 transition-all shadow-2xl relative overflow-hidden group">
-                         <div className="absolute top-0 right-0 w-32 h-32 bg-brand-gold/5 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2"></div>
-                         
-                         <div className="flex flex-col lg:flex-row justify-between gap-8 relative z-10">
-                            <div className="flex flex-col md:flex-row gap-8">
-                               <div className="w-16 h-16 bg-brand-gold/10 rounded-2xl flex items-center justify-center text-brand-gold border border-brand-gold/20 shrink-0 shadow-lg group-hover:scale-105 transition-transform">
-                                  <Zap size={32} />
-                               </div>
-                               <div className="space-y-4">
-                                  <div>
-                                    <div className="flex items-center gap-3 mb-1">
-                                      <h5 className="text-white font-bold text-2xl">{sub.userName}</h5>
-                                      <span className={`text-[9px] font-bold px-3 py-1 rounded-full uppercase tracking-widest shadow-lg ${sub.planType === 'lifetime' ? 'bg-brand-red text-white' : 'bg-brand-gold text-brand-black'}`}>{sub.planType}</span>
-                                    </div>
-                                    <p className="text-gray-500 text-sm font-sans flex items-center gap-4">
-                                      <span className="flex items-center gap-1.5"><Mail size={12} className="text-brand-gold" /> {sub.userEmail}</span>
-                                      <span className="flex items-center gap-1.5"><Smartphone size={12} className="text-brand-gold" /> {sub.phone}</span>
-                                    </p>
-                                  </div>
-                                  <div className="p-5 bg-black/50 rounded-2xl border border-white/5 shadow-inner inline-block min-w-[200px]">
-                                     <p className="text-[9px] text-gray-500 uppercase font-bold tracking-widest mb-2">Verification Data</p>
-                                     <div className="grid grid-cols-2 gap-x-4 gap-y-2">
-                                        <span className="text-gray-400 text-xs">TXN ID:</span>
-                                        <span className="text-brand-gold font-mono font-bold tracking-wider text-xs">{sub.transactionId}</span>
-                                        <span className="text-gray-400 text-xs">Amount:</span>
-                                        <span className="text-white font-bold text-xs">₹{sub.amountPaid}</span>
-                                     </div>
-                                  </div>
-                               </div>
-                            </div>
-
-                            <div className="flex flex-col sm:flex-row lg:flex-col gap-3 justify-center shrink-0">
-                               <button 
-                                 onClick={() => handleApproveSub(sub)} 
-                                 disabled={isProcessingSub === sub.id}
-                                 className="flex items-center justify-center gap-2 px-10 py-4 bg-green-500 text-white rounded-xl text-xs font-bold uppercase tracking-widest hover:bg-green-600 transition-all shadow-lg active:scale-95 disabled:opacity-50"
-                               >
-                                 {isProcessingSub === sub.id ? <Loader2 size={16} className="animate-spin" /> : <><Check size={16} /> Approve</>}
-                               </button>
-                               <button 
-                                 onClick={() => setRejectingSub(sub.id)}
-                                 className="flex items-center justify-center gap-2 px-10 py-4 border border-brand-red text-brand-red rounded-xl text-xs font-bold uppercase tracking-widest hover:bg-brand-red hover:text-white transition-all active:scale-95"
-                               >
-                                 <XCircle size={16} /> Reject
-                               </button>
-                            </div>
-                         </div>
-                      </div>
-                    ))
-                  )}
-                </div>
-              ) : (
-                <div className="bg-brand-dark/40 border border-brand-gold/10 rounded-3xl overflow-hidden shadow-2xl animate-fade-in">
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-left">
-                      <thead>
-                        <tr className="bg-black/50 text-[10px] text-gray-500 uppercase font-bold tracking-[0.2em] border-b border-white/5">
-                          <th className="px-8 py-5">Subscriber</th>
-                          <th className="px-8 py-5">Status</th>
-                          <th className="px-8 py-5">Plan</th>
-                          <th className="px-8 py-5">Join Date</th>
-                          <th className="px-8 py-5">Expiry Date</th>
-                          <th className="px-8 py-5 text-right">Action</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-white/5">
-                        {Object.values(allUsers).filter((u: UserProfile) => u.role === 'subscriber' || u.subscription?.status === 'expired').length === 0 ? (
-                          <tr>
-                            <td colSpan={6} className="px-8 py-20 text-center text-gray-500 italic font-serif">No subscribers found.</td>
-                          </tr>
-                        ) : (
-                          Object.values(allUsers).filter((u: UserProfile) => u.role === 'subscriber' || u.subscription?.status === 'expired').map((subscriber: any) => {
-                            const isExpired = subscriber.subscription?.status === 'expired' || 
-                                            (subscriber.subscription?.plan === 'yearly' && 
-                                             subscriber.subscription?.expiryDate && 
-                                             new Date(subscriber.subscription.expiryDate) <= new Date());
-                            
-                            return (
-                              <tr key={subscriber.uid} className={`hover:bg-white/[0.02] transition-colors group ${isExpired ? 'opacity-60' : ''}`}>
-                                <td className="px-8 py-6">
-                                  <div className="flex items-center gap-3">
-                                     <div className={`w-8 h-8 rounded-full border flex items-center justify-center ${isExpired ? 'bg-gray-800 border-gray-700 text-gray-500' : 'bg-brand-gold/10 border-brand-gold/30 text-brand-gold'}`}><User size={14} /></div>
-                                     <div className="flex flex-col">
-                                       <span className="text-white font-bold">{subscriber.name}</span>
-                                       <span className="text-gray-500 text-[10px]">{subscriber.email}</span>
-                                     </div>
-                                  </div>
-                                </td>
-                                <td className="px-8 py-6">
-                                  <span className={`text-[9px] font-bold px-2 py-1 rounded-full uppercase tracking-tighter ${isExpired ? 'bg-red-500/20 text-red-500 border border-red-500/30' : 'bg-green-500/20 text-green-500 border border-green-500/30'}`}>
-                                    {isExpired ? 'Expired' : 'Active'}
-                                  </span>
-                                </td>
-                                <td className="px-8 py-6">
-                                  <span className={`text-[10px] font-bold px-3 py-1 rounded-full uppercase tracking-widest ${subscriber.subscription?.plan === 'lifetime' ? 'bg-brand-red text-white' : 'bg-brand-gold text-brand-black'}`}>{subscriber.subscription?.plan}</span>
-                                </td>
-                                <td className="px-8 py-6">
-                                  <span className="text-gray-400 text-xs">{new Date(subscriber.subscription?.startDate || subscriber.createdAt).toLocaleDateString()}</span>
-                                </td>
-                                <td className="px-8 py-6">
-                                  <span className={`text-xs font-bold ${subscriber.subscription?.plan === 'lifetime' ? 'text-blue-400 uppercase' : isExpired ? 'text-red-400' : 'text-gray-300'}`}>
-                                    {subscriber.subscription?.plan === 'lifetime' ? 'Lifetime' : (subscriber.subscription?.expiryDate ? new Date(subscriber.subscription.expiryDate).toLocaleDateString() : 'N/A')}
-                                  </span>
-                                </td>
-                                <td className="px-8 py-6 text-right">
-                                  <button onClick={() => deleteItem('users', subscriber.uid)} className="p-2 text-gray-700 hover:text-red-500 transition-colors"><Trash2 size={16} /></button>
-                                </td>
-                              </tr>
-                            );
-                          })
-                        )}
-                      </tbody>
-                    </table>
+              <div className="grid grid-cols-1 gap-6">
+                {subscriptions.filter(s => s.status === 'pending').map(sub => (
+                  <div key={sub.id} className="bg-brand-dark/40 border border-brand-gold/30 rounded-3xl p-8 shadow-2xl relative overflow-hidden group">
+                     <div className="flex flex-col lg:flex-row justify-between gap-8 relative z-10">
+                        <div className="flex flex-col md:flex-row gap-8">
+                           <div className="w-16 h-16 bg-brand-gold/10 rounded-2xl flex items-center justify-center text-brand-gold border border-brand-gold/20 shrink-0"><Zap size={32} /></div>
+                           <div className="space-y-4">
+                              <h5 className="text-white font-bold text-2xl">{sub.userName}</h5>
+                              <p className="text-gray-500 text-sm">{sub.userEmail} • {sub.phone}</p>
+                              <div className="p-5 bg-black/50 rounded-2xl border border-white/5 inline-block min-w-[200px]">
+                                 <div className="grid grid-cols-2 gap-x-4 gap-y-2">
+                                    <span className="text-gray-400 text-xs">TXN ID:</span>
+                                    <span className="text-brand-gold font-mono font-bold text-xs">{sub.transactionId}</span>
+                                    <span className="text-gray-400 text-xs">Amount:</span>
+                                    <span className="text-white font-bold text-xs">₹{sub.amountPaid}</span>
+                                 </div>
+                              </div>
+                           </div>
+                        </div>
+                        <div className="flex flex-col lg:flex-col gap-3 justify-center shrink-0">
+                           <button onClick={() => handleApproveSub(sub)} disabled={isProcessingSub === sub.id} className="px-10 py-4 bg-green-500 text-white rounded-xl text-xs font-bold uppercase tracking-widest hover:bg-green-600 transition-all shadow-lg">{isProcessingSub === sub.id ? <Loader2 size={16} className="animate-spin" /> : "Approve"}</button>
+                        </div>
+                     </div>
                   </div>
-                </div>
-              )}
+                ))}
+              </div>
             </div>
           )}
         </div>
       </div>
 
-      {/* Subscription Rejection Modal */}
-      {rejectingSub && (
-        <div className="fixed inset-0 z-[120] bg-black/80 backdrop-blur-md flex items-center justify-center p-4 animate-fade-in">
-          <div className="bg-brand-dark border border-brand-red/30 rounded-3xl p-8 w-full max-w-md shadow-2xl animate-fade-in-up">
-            <h3 className="text-2xl font-display font-bold text-white uppercase tracking-widest mb-2">Reject Request</h3>
-            <p className="text-[10px] text-gray-500 uppercase font-bold tracking-widest mb-8">This action is permanent and notifies the user.</p>
+      {/* Menu Edit/Add Modal */}
+      {isMenuFormOpen && (
+        <div className="fixed inset-0 z-[120] bg-black/90 backdrop-blur-md flex items-center justify-center p-4 animate-fade-in">
+          <div className="bg-brand-dark border border-brand-gold/30 rounded-3xl p-8 w-full max-w-2xl shadow-2xl animate-fade-in-up">
+            <div className="flex justify-between items-center mb-8">
+              <h3 className="text-2xl font-display font-bold text-white uppercase tracking-widest">{editingMenuItem ? 'Edit Item' : 'New Menu Item'}</h3>
+              <button onClick={() => setIsMenuFormOpen(false)} className="text-gray-500 hover:text-white"><X /></button>
+            </div>
             
-            <div className="space-y-6">
-              <div>
-                <label className="text-[10px] text-gray-500 uppercase font-bold tracking-widest mb-3 block">Reason for Rejection</label>
-                <select 
-                  className="w-full bg-black/40 border border-gray-700 rounded-xl p-4 text-white focus:border-brand-gold outline-none transition-all" 
-                  value={rejectReason} 
-                  onChange={(e) => setRejectReason(e.target.value)}
-                >
-                  <option value="">Select a reason...</option>
-                  <option value="Invalid Transaction ID">Invalid Transaction ID</option>
-                  <option value="Payment Not Received">Payment Not Received</option>
-                  <option value="Amount Mismatch">Amount Mismatch</option>
-                  <option value="Duplicate Request">Duplicate Request</option>
-                  <option value="Other">Other Reason...</option>
+            <form onSubmit={handleSaveMenuItem} className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="space-y-2">
+                <label className="text-[10px] text-gray-500 uppercase font-bold tracking-widest">Item Name *</label>
+                <input required type="text" value={menuForm.itemName} onChange={e => setMenuForm({...menuForm, itemName: e.target.value})} className="w-full bg-black/40 border border-gray-700 rounded-xl p-3 text-white text-sm outline-none focus:border-brand-gold" placeholder="e.g. Butter Chicken" />
+              </div>
+              <div className="space-y-2">
+                <label className="text-[10px] text-gray-500 uppercase font-bold tracking-widest">Price (₹) *</label>
+                <input required type="number" value={menuForm.priceNum} onChange={e => setMenuForm({...menuForm, priceNum: parseInt(e.target.value)})} className="w-full bg-black/40 border border-gray-700 rounded-xl p-3 text-white text-sm outline-none focus:border-brand-gold" placeholder="0" />
+              </div>
+              <div className="space-y-2">
+                <label className="text-[10px] text-gray-500 uppercase font-bold tracking-widest">Category *</label>
+                <select required value={menuForm.category} onChange={e => setMenuForm({...menuForm, category: e.target.value})} className="w-full bg-black/40 border border-gray-700 rounded-xl p-3 text-white text-sm outline-none focus:border-brand-gold">
+                  <option value="">Select Category</option>
+                  <option value="Starters">Starters</option>
+                  <option value="Main Course">Main Course</option>
+                  <option value="Chinese">Chinese</option>
+                  <option value="Snacks">Snacks</option>
+                  <option value="Drinks">Drinks</option>
+                  <option value="Desserts">Desserts</option>
                 </select>
               </div>
+              <div className="space-y-2">
+                <label className="text-[10px] text-gray-500 uppercase font-bold tracking-widest">Type *</label>
+                <select required value={menuForm.categoryType} onChange={e => setMenuForm({...menuForm, categoryType: e.target.value})} className="w-full bg-black/40 border border-gray-700 rounded-xl p-3 text-white text-sm outline-none focus:border-brand-gold">
+                  <option value="Veg">Veg</option>
+                  <option value="Non-Veg">Non-Veg</option>
+                  <option value="Jain">Jain</option>
+                  <option value="Special">Special</option>
+                </select>
+              </div>
+              <div className="md:col-span-2 space-y-2">
+                <label className="text-[10px] text-gray-500 uppercase font-bold tracking-widest">Description</label>
+                <textarea value={menuForm.description} onChange={e => setMenuForm({...menuForm, description: e.target.value})} className="w-full bg-black/40 border border-gray-700 rounded-xl p-3 text-white text-sm outline-none focus:border-brand-gold h-20 resize-none" placeholder="Brief details about the dish..." />
+              </div>
+              <div className="md:col-span-2 space-y-2">
+                <label className="text-[10px] text-gray-500 uppercase font-bold tracking-widest">Google Drive Image Link *</label>
+                <input required type="text" value={menuForm.backgroundImageUrl} onChange={e => setMenuForm({...menuForm, backgroundImageUrl: e.target.value})} className="w-full bg-black/40 border border-gray-700 rounded-xl p-3 text-white text-sm outline-none focus:border-brand-gold" placeholder="https://drive.google.com/..." />
+              </div>
               
-              <div className="flex gap-3 pt-4">
-                <button 
-                  onClick={handleRejectSub} 
-                  disabled={!rejectReason || isProcessingSub === rejectingSub}
-                  className="flex-1 py-4 bg-brand-red text-white rounded-xl text-xs font-bold uppercase tracking-widest hover:bg-red-700 transition-all shadow-lg active:scale-95 disabled:opacity-50"
-                >
-                  {isProcessingSub === rejectingSub ? <Loader2 size={16} className="animate-spin" /> : "Confirm Rejection"}
-                </button>
-                <button 
-                  onClick={() => { setRejectingSub(null); setRejectReason(''); }} 
-                  className="px-8 py-4 border border-gray-700 text-gray-500 rounded-xl text-xs font-bold uppercase tracking-widest hover:text-white transition-all"
-                >
-                  Back
-                </button>
+              <div className="md:col-span-2 flex flex-wrap gap-6 pt-4">
+                <label className="flex items-center gap-3 cursor-pointer">
+                  <input type="checkbox" checked={menuForm.isAvailable} onChange={e => setMenuForm({...menuForm, isAvailable: e.target.checked})} className="w-4 h-4 rounded border-gray-700 bg-black/40 text-brand-gold focus:ring-brand-gold" />
+                  <span className="text-[10px] text-gray-300 uppercase font-bold tracking-widest">Live Availability</span>
+                </label>
+                <label className="flex items-center gap-3 cursor-pointer">
+                  <input type="checkbox" checked={menuForm.isRecommended} onChange={e => setMenuForm({...menuForm, isRecommended: e.target.checked})} className="w-4 h-4 rounded border-gray-700 bg-black/40 text-brand-gold focus:ring-brand-gold" />
+                  <span className="text-[10px] text-gray-300 uppercase font-bold tracking-widest">Recommended</span>
+                </label>
+                <label className="flex items-center gap-3 cursor-pointer">
+                  <input type="checkbox" checked={menuForm.isNewItem} onChange={e => setMenuForm({...menuForm, isNewItem: e.target.checked})} className="w-4 h-4 rounded border-gray-700 bg-black/40 text-brand-gold focus:ring-brand-gold" />
+                  <span className="text-[10px] text-gray-300 uppercase font-bold tracking-widest">New Item</span>
+                </label>
               </div>
-            </div>
-          </div>
-        </div>
-      )}
 
-      {/* Other Modals (Reject Booking / Order) remain as they were */}
-      {actioningBooking && (
-        <div className="fixed inset-0 z-[120] bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
-          <div className="bg-brand-dark border border-brand-gold/30 rounded-3xl p-8 w-full max-w-md">
-            <h3 className="text-2xl font-display font-bold text-white uppercase tracking-widest mb-6">Reject Booking</h3>
-            <div className="space-y-4">
-              <label className="text-[10px] text-gray-500 font-bold uppercase tracking-widest">Reason</label>
-              <select className="w-full bg-black/40 border border-gray-700 rounded-xl p-4 text-white focus:border-brand-gold outline-none" value={actionReason} onChange={(e) => setActionReason(e.target.value)}>
-                <option value="">Select a reason...</option>
-                <option value="Fully Booked">Fully Booked</option>
-                <option value="Operational Issues">Operational Issues</option>
-                <option value="Closed for Private Event">Closed for Private Event</option>
-                <option value="Other">Other...</option>
-              </select>
-              <div className="flex gap-4 pt-4">
-                 <button onClick={() => setActioningBooking(null)} className="flex-1 py-4 bg-red-600 text-white rounded-xl text-xs font-bold uppercase tracking-widest">Reject</button>
-                 <button onClick={() => setActioningBooking(null)} className="px-6 py-4 border border-gray-700 text-gray-500 rounded-xl text-xs font-bold uppercase tracking-widest hover:text-white">Cancel</button>
+              <div className="md:col-span-2 flex gap-4 pt-6">
+                 <button type="submit" className="flex-1 py-4 bg-brand-gold text-brand-black rounded-xl text-xs font-bold uppercase tracking-widest hover:bg-white transition-all shadow-lg active:scale-95">Save Menu Item</button>
+                 <button type="button" onClick={() => setIsMenuFormOpen(false)} className="px-10 py-4 border border-gray-700 text-gray-500 rounded-xl text-xs font-bold uppercase tracking-widest hover:text-white">Cancel</button>
               </div>
-            </div>
+            </form>
           </div>
         </div>
       )}

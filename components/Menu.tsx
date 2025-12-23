@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { db } from '../firebase';
 import { collection, onSnapshot, query, orderBy, addDoc, doc, getDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 import { User } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
-import { Utensils, Loader2, ArrowLeft, X, Minus, Plus, Award, ChevronRight, Truck, Coffee, Sofa, Coins, CreditCard, Search as SearchIcon } from 'lucide-react';
+import { Utensils, Loader2, ArrowLeft, X, Minus, Plus, Award, ChevronRight, Truck, Coffee, Sofa, Coins, CreditCard, Search as SearchIcon, Star, Zap } from 'lucide-react';
 import { MenuItem, CategoryConfig, Order, OrderType, UserProfile, UserCategory, PaymentMode } from '../types';
 import { getOptimizedImageURL } from '../constants';
 
@@ -19,6 +19,7 @@ const Menu: React.FC<MenuProps> = ({ whatsappNumber, user, currentPoints, onNavi
   const [categoryConfigs, setCategoryConfigs] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
+  const [activeTypeFilter, setActiveTypeFilter] = useState<string>('All');
   const [uniqueCategories, setUniqueCategories] = useState<string[]>([]);
   const [isOrderModalOpen, setIsOrderModalOpen] = useState(false);
   const [selectedOrderItem, setSelectedOrderItem] = useState<MenuItem | null>(null);
@@ -47,7 +48,7 @@ const Menu: React.FC<MenuProps> = ({ whatsappNumber, user, currentPoints, onNavi
 
     const qMenu = query(collection(db, "menu"), orderBy("name"));
     const unsubMenu = onSnapshot(qMenu, (snapshot) => {
-      const fetchedItems = snapshot.docs.map(doc => doc.data() as MenuItem);
+      const fetchedItems = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as MenuItem));
       setItems(fetchedItems);
       const cats = Array.from(new Set(fetchedItems.map(i => i.category))).sort() as string[];
       setUniqueCategories(cats);
@@ -65,15 +66,28 @@ const Menu: React.FC<MenuProps> = ({ whatsappNumber, user, currentPoints, onNavi
   }, [user]);
 
   const filteredItems = items.filter(item => {
-    const matchesSearch = item.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
+    // Only show available items
+    if (item.isAvailable === false) return false;
+
+    const matchesSearch = (item.itemName || item.name).toLowerCase().includes(searchQuery.toLowerCase()) || 
                           item.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
                           item.category.toLowerCase().includes(searchQuery.toLowerCase());
+    
     const matchesCategory = activeCategory ? item.category === activeCategory : true;
-    return matchesSearch && matchesCategory;
+    
+    const type = item.categoryType || (item.isVegetarian ? 'Veg' : 'Special');
+    const matchesType = activeTypeFilter === 'All' ? true : type === activeTypeFilter;
+
+    return matchesSearch && matchesCategory && matchesType;
   });
 
-  const calculatePotentialPoints = (priceStr: string, quantity: number) => {
-    const cleanPrice = parseInt(priceStr.replace(/\D/g, '')) || 0;
+  const calculatePotentialPoints = (priceStr: string | number, quantity: number) => {
+    let cleanPrice = 0;
+    if (typeof priceStr === 'number') {
+      cleanPrice = priceStr;
+    } else {
+      cleanPrice = parseInt(priceStr?.replace(/\D/g, '') || '0');
+    }
     const total = cleanPrice * quantity;
     const rate = userProfile?.role === 'subscriber' ? 0.15 : 0.10;
     return Math.floor(total * rate);
@@ -81,7 +95,6 @@ const Menu: React.FC<MenuProps> = ({ whatsappNumber, user, currentPoints, onNavi
 
   const handleOrderClick = (item: MenuItem) => {
     if (!user) {
-      console.log("User not logged in → redirecting to login");
       alert("Please login or register to place an order.");
       onNavigate();
       return;
@@ -95,9 +108,15 @@ const Menu: React.FC<MenuProps> = ({ whatsappNumber, user, currentPoints, onNavi
     e.preventDefault();
     if (!selectedOrderItem || !user) return;
 
-    const cleanPrice = parseInt(selectedOrderItem.price?.replace(/\D/g, '') || "0");
-    const totalAmount = cleanPrice * orderFormData.quantity;
-    const potentialPoints = calculatePotentialPoints(selectedOrderItem.price || "0", orderFormData.quantity);
+    let totalAmount = 0;
+    if (selectedOrderItem.priceNum) {
+      totalAmount = selectedOrderItem.priceNum * orderFormData.quantity;
+    } else {
+      const cleanPrice = parseInt(selectedOrderItem.price?.replace(/\D/g, '') || "0");
+      totalAmount = cleanPrice * orderFormData.quantity;
+    }
+
+    const potentialPoints = calculatePotentialPoints(selectedOrderItem.priceNum || selectedOrderItem.price || 0, orderFormData.quantity);
     const userType: UserCategory = userProfile?.role === 'subscriber' ? 'subscriber' : 'registered';
     const requiredPoints = totalAmount * 2;
 
@@ -112,7 +131,7 @@ const Menu: React.FC<MenuProps> = ({ whatsappNumber, user, currentPoints, onNavi
       userName: orderFormData.name,
       userPhone: orderFormData.phone,
       address: orderFormData.address,
-      itemName: selectedOrderItem.name,
+      itemName: selectedOrderItem.itemName || selectedOrderItem.name,
       orderType: orderFormData.type,
       orderAmount: totalAmount,
       quantity: orderFormData.quantity,
@@ -129,11 +148,9 @@ const Menu: React.FC<MenuProps> = ({ whatsappNumber, user, currentPoints, onNavi
 
     try {
       const docRef = await addDoc(collection(db, "orders"), orderData);
-      console.log("Point Order Created:", docRef.id);
-      
       const message = `*NEW ${orderFormData.type.replace('_', ' ').toUpperCase()} (${userType.toUpperCase()}) - Chef's Jalsa*\n` +
                       `*Order ID:* ${docRef.id}\n` +
-                      `*Item:* ${selectedOrderItem.name}\n` +
+                      `*Item:* ${selectedOrderItem.itemName || selectedOrderItem.name}\n` +
                       `*Qty:* ${orderFormData.quantity}\n` +
                       `*Total:* ₹${orderData.orderAmount}\n` +
                       `*Payment Mode:* ${selectedPaymentMode.toUpperCase()}\n` +
@@ -145,16 +162,21 @@ const Menu: React.FC<MenuProps> = ({ whatsappNumber, user, currentPoints, onNavi
       window.open(`https://wa.me/${whatsappNumber}?text=${encodeURIComponent(message)}`, '_blank');
       setIsOrderModalOpen(false);
       alert(selectedPaymentMode === 'points' 
-        ? "Order submitted via Points! Points will be deducted after successful delivery. No points are earned for this order." 
-        : "Order submitted successfully! You can track live status in your dashboard.");
+        ? "Order submitted via Points!" 
+        : "Order submitted successfully! Track status in your dashboard.");
     } catch (err) { 
       console.error(err);
-      alert("Error processing order. Please try again.");
+      alert("Error processing order.");
     }
   };
 
-  const currentPrice = parseInt(selectedOrderItem?.price?.replace(/\D/g, '') || "0");
-  const totalAmountRedeem = currentPrice * orderFormData.quantity;
+  const getCleanPrice = (item: MenuItem | null) => {
+    if (!item) return 0;
+    if (item.priceNum) return item.priceNum;
+    return parseInt(item.price?.replace(/\D/g, '') || "0");
+  };
+
+  const totalAmountRedeem = getCleanPrice(selectedOrderItem) * orderFormData.quantity;
   const requiredRedeemPoints = totalAmountRedeem * 2;
   const hasEnoughPoints = (userProfile?.points || 0) >= requiredRedeemPoints;
 
@@ -164,17 +186,15 @@ const Menu: React.FC<MenuProps> = ({ whatsappNumber, user, currentPoints, onNavi
         {user && (
           <div className="mb-12 bg-brand-dark p-6 rounded-2xl flex flex-col md:flex-row items-center justify-between border border-brand-gold/30 shadow-xl gap-4">
              <div className="flex items-center gap-4">
-                <div className="w-16 h-16 bg-brand-gold/20 rounded-full flex items-center justify-center text-brand-gold">
-                  <Award size={32} />
-                </div>
+                <div className="w-16 h-16 bg-brand-gold/20 rounded-full flex items-center justify-center text-brand-gold"><Award size={32} /></div>
                 <div>
                    <h4 className="text-white font-display text-xl">Loyalty Rewards</h4>
-                   <p className="text-gray-400 text-sm">Earn {userProfile?.role === 'subscriber' ? '15%' : '10%'} points on every delivered order</p>
+                   <p className="text-gray-400 text-sm">Earn {userProfile?.role === 'subscriber' ? '15%' : '10%'} points</p>
                 </div>
              </div>
              <div className="text-center md:text-right">
                 <div className="text-4xl font-bold text-brand-gold">{currentPoints}</div>
-                <div className="text-gray-400 text-xs uppercase tracking-widest">Available Points (₹{currentPoints / 2} Value)</div>
+                <div className="text-gray-400 text-xs uppercase tracking-widest">Available Points (₹{currentPoints / 2})</div>
              </div>
           </div>
         )}
@@ -185,21 +205,31 @@ const Menu: React.FC<MenuProps> = ({ whatsappNumber, user, currentPoints, onNavi
           <div className="w-32 h-1 bg-brand-gold mx-auto mt-6"></div>
         </div>
 
-        {/* Search Bar */}
-        <div className="max-w-md mx-auto mb-12 relative group">
-          <input 
-            type="text" 
-            placeholder="Search menu items..." 
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full bg-brand-cream border border-gray-200 rounded-full py-4 px-12 focus:outline-none focus:border-brand-gold focus:ring-1 focus:ring-brand-gold transition-all shadow-sm"
-          />
-          <SearchIcon className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-brand-gold transition-colors" size={20} />
-          {searchQuery && (
-            <button onClick={() => setSearchQuery('')} className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-brand-red transition-colors">
-              <X size={20} />
-            </button>
-          )}
+        <div className="flex flex-col md:flex-row items-center justify-center gap-6 mb-12">
+          {/* Search Bar */}
+          <div className="w-full max-w-md relative group">
+            <input 
+              type="text" 
+              placeholder="Search dishes..." 
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full bg-brand-cream border border-gray-200 rounded-full py-4 px-12 focus:outline-none focus:border-brand-gold transition-all shadow-sm"
+            />
+            <SearchIcon className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-brand-gold" size={20} />
+          </div>
+
+          {/* Type Filter */}
+          <div className="flex bg-brand-cream p-1 rounded-full border border-gray-200 shadow-sm">
+             {['All', 'Veg', 'Non-Veg', 'Special'].map(type => (
+               <button 
+                 key={type} 
+                 onClick={() => setActiveTypeFilter(type)}
+                 className={`px-6 py-2 rounded-full text-[10px] font-bold uppercase tracking-widest transition-all ${activeTypeFilter === type ? 'bg-brand-dark text-white shadow-md' : 'text-gray-500 hover:text-brand-dark'}`}
+               >
+                 {type}
+               </button>
+             ))}
+          </div>
         </div>
 
         {loading ? (
@@ -219,9 +249,9 @@ const Menu: React.FC<MenuProps> = ({ whatsappNumber, user, currentPoints, onNavi
                     <Utensils className="text-brand-gold/20 w-32 h-32" />
                   </div>
                 )}
-                <div className="absolute inset-0 bg-gradient-to-t from-brand-black via-brand-black/40 to-transparent z-10 transition-colors group-hover:bg-brand-black/20"></div>
+                <div className="absolute inset-0 bg-gradient-to-t from-brand-black via-brand-black/40 to-transparent z-10"></div>
                 <div className="absolute inset-0 flex flex-col items-center justify-center z-20 text-center p-6">
-                  <h3 className="text-4xl font-display font-bold text-white mb-4 tracking-wider group-hover:scale-105 transition-transform">{cat}</h3>
+                  <h3 className="text-4xl font-display font-bold text-white mb-4 tracking-wider">{cat}</h3>
                   <div className="flex items-center gap-2 text-brand-gold opacity-0 group-hover:opacity-100 transition-all transform translate-y-4 group-hover:translate-y-0">
                     <span className="text-xs font-bold uppercase tracking-[0.2em]">View Selection</span>
                     <ChevronRight size={16} />
@@ -233,42 +263,47 @@ const Menu: React.FC<MenuProps> = ({ whatsappNumber, user, currentPoints, onNavi
         ) : (
           <div>
             <button onClick={() => { setActiveCategory(null); setSearchQuery(''); }} className="mb-8 flex items-center text-brand-gold font-bold uppercase text-xs hover:gap-3 transition-all">
-              <ArrowLeft className="mr-2" /> {searchQuery ? 'Back to categories' : 'All Categories'}
+              <ArrowLeft className="mr-2" /> Back
             </button>
             
-            {filteredItems.length === 0 ? (
-              <div className="text-center py-24 bg-brand-cream/50 rounded-3xl border border-dashed border-gray-300">
-                <Utensils size={48} className="text-gray-300 mx-auto mb-4" />
-                <h3 className="text-xl font-serif text-gray-500">No items match your search</h3>
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-                {filteredItems.map((item, idx) => (
-                  <div key={idx} className="bg-white border border-gray-100 rounded-xl overflow-hidden shadow-sm hover:shadow-2xl transition-all duration-300 flex flex-col animate-fade-in-up" style={{ animationDelay: `${idx * 0.05}s` }}>
-                    <div className="h-64 bg-gray-100 relative overflow-hidden">
-                      {item.image ? (
-                        <img src={getOptimizedImageURL(item.image)} className="w-full h-full object-cover hover:scale-110 transition-transform duration-700" alt={item.name} />
-                      ) : (
-                        <div className="flex items-center justify-center h-full"><Utensils className="text-gray-300" size={48} /></div>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+              {filteredItems.map((item, idx) => (
+                <div key={idx} className="bg-white border border-gray-100 rounded-xl overflow-hidden shadow-sm hover:shadow-2xl transition-all duration-300 flex flex-col animate-fade-in-up" style={{ animationDelay: `${idx * 0.05}s` }}>
+                  <div className="h-64 bg-gray-100 relative overflow-hidden">
+                    {item.backgroundImageUrl || item.image ? (
+                      <img src={getOptimizedImageURL(item.backgroundImageUrl || item.image || '')} className="w-full h-full object-cover hover:scale-110 transition-transform duration-700" alt={item.itemName || item.name} />
+                    ) : (
+                      <div className="flex items-center justify-center h-full"><Utensils className="text-gray-300" size={48} /></div>
+                    )}
+                    
+                    {/* Status Badges */}
+                    <div className="absolute top-4 left-4 flex flex-col gap-2">
+                      <span className="bg-brand-black/60 backdrop-blur-md text-white text-[8px] font-bold uppercase tracking-widest px-3 py-1 rounded-full border border-white/10">{item.category}</span>
+                      {item.isNewItem && (
+                        <span className="bg-blue-500 text-white text-[8px] font-bold uppercase tracking-widest px-3 py-1 rounded-full flex items-center gap-1 shadow-lg w-fit">
+                          <Zap size={10} fill="currentColor" /> New Arrival
+                        </span>
                       )}
-                      <div className="absolute top-4 left-4">
-                        <span className="bg-brand-black/60 backdrop-blur-md text-white text-[8px] font-bold uppercase tracking-widest px-3 py-1 rounded-full border border-white/10">{item.category}</span>
-                      </div>
-                    </div>
-                    <div className="p-6 flex-1 flex flex-col">
-                      <div className="flex justify-between items-start mb-4">
-                        <h4 className="font-serif font-bold text-2xl text-brand-dark">{item.name}</h4>
-                        <span className="text-brand-gold font-bold text-lg">{item.price}</span>
-                      </div>
-                      <p className="text-gray-500 text-sm mb-8 flex-1 leading-relaxed">{item.description}</p>
-                      <button onClick={() => handleOrderClick(item)} className="w-full py-4 bg-brand-dark text-white rounded-lg font-bold uppercase text-xs tracking-widest hover:bg-brand-gold hover:text-brand-black transition-all shadow-md active:scale-95">
-                        {userProfile?.role === 'subscriber' ? 'Order (Premium Rate Enabled)' : user ? 'Order & Earn Points' : 'Order Now'}
-                      </button>
+                      {item.isRecommended && (
+                        <span className="bg-brand-gold text-brand-black text-[8px] font-bold uppercase tracking-widest px-3 py-1 rounded-full flex items-center gap-1 shadow-lg w-fit">
+                          <Star size={10} fill="currentColor" /> Chef Recommended
+                        </span>
+                      )}
                     </div>
                   </div>
-                ))}
-              </div>
-            )}
+                  <div className="p-6 flex-1 flex flex-col">
+                    <div className="flex justify-between items-start mb-4">
+                      <h4 className="font-serif font-bold text-2xl text-brand-dark">{item.itemName || item.name}</h4>
+                      <span className="text-brand-gold font-bold text-lg">{item.priceNum ? `₹${item.priceNum}` : item.price}</span>
+                    </div>
+                    <p className="text-gray-500 text-sm mb-8 flex-1 leading-relaxed">{item.description}</p>
+                    <button onClick={() => handleOrderClick(item)} className="w-full py-4 bg-brand-dark text-white rounded-lg font-bold uppercase text-xs tracking-widest hover:bg-brand-gold hover:text-brand-black transition-all shadow-md active:scale-95">
+                      {user ? 'Order & Earn Points' : 'Order Now'}
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
         )}
       </div>
@@ -324,11 +359,6 @@ const Menu: React.FC<MenuProps> = ({ whatsappNumber, user, currentPoints, onNavi
                     <span className="text-xs font-bold uppercase tracking-widest">Redeem Points</span>
                   </button>
                 </div>
-                {!hasEnoughPoints && (
-                  <p className="text-[10px] text-red-500 font-bold uppercase tracking-tighter text-center">
-                    Insufficient points. You need {requiredRedeemPoints} points.
-                  </p>
-                )}
               </div>
 
               {selectedPaymentMode === 'points' ? (
@@ -337,7 +367,6 @@ const Menu: React.FC<MenuProps> = ({ whatsappNumber, user, currentPoints, onNavi
                     <span className="text-xs font-bold text-brand-gold/60 uppercase tracking-widest block mb-1">Points to Deduct</span>
                     <span className="text-2xl font-display font-bold text-brand-gold">-{requiredRedeemPoints} Points</span>
                     <p className="text-[10px] text-gray-400 font-bold uppercase mt-1">Value: ₹{totalAmountRedeem}</p>
-                    <p className="text-[9px] text-brand-red font-bold uppercase mt-1">No points earned on this order</p>
                   </div>
                   <Coins size={32} className="text-brand-gold" />
                 </div>
@@ -345,8 +374,7 @@ const Menu: React.FC<MenuProps> = ({ whatsappNumber, user, currentPoints, onNavi
                 <div className="bg-brand-gold/10 p-5 rounded-xl border border-brand-gold/30 flex items-center justify-between">
                   <div>
                     <span className="text-xs font-bold text-brand-black/60 uppercase tracking-widest block mb-1">Potential Rewards</span>
-                    <span className="text-2xl font-display font-bold text-brand-red">+{calculatePotentialPoints(selectedOrderItem.price || "0", orderFormData.quantity)} Points</span>
-                    {userProfile?.role === 'subscriber' && <p className="text-[10px] text-brand-gold font-bold uppercase mt-1">15% Premium Rate Active</p>}
+                    <span className="text-2xl font-display font-bold text-brand-red">+{calculatePotentialPoints(selectedOrderItem.priceNum || selectedOrderItem.price || 0, orderFormData.quantity)} Points</span>
                   </div>
                   <Award size={32} className="text-brand-gold" />
                 </div>
@@ -354,8 +382,8 @@ const Menu: React.FC<MenuProps> = ({ whatsappNumber, user, currentPoints, onNavi
               
               <div className="flex items-center justify-between border-b border-gray-100 pb-6">
                 <div className="flex-1">
-                  <span className="font-bold text-lg block">{selectedOrderItem.name}</span>
-                  <span className="text-gray-500 text-sm">{selectedOrderItem.price} / unit</span>
+                  <span className="font-bold text-lg block">{selectedOrderItem.itemName || selectedOrderItem.name}</span>
+                  <span className="text-gray-500 text-sm">{selectedOrderItem.priceNum ? `₹${selectedOrderItem.priceNum}` : selectedOrderItem.price} / unit</span>
                 </div>
                 <div className="flex items-center gap-4 bg-gray-50 p-2 rounded-lg border border-gray-200">
                   <button type="button" className="p-1 hover:bg-gray-200 rounded" onClick={() => setOrderFormData({...orderFormData, quantity: Math.max(1, orderFormData.quantity-1)})}><Minus size={16}/></button>
@@ -367,18 +395,11 @@ const Menu: React.FC<MenuProps> = ({ whatsappNumber, user, currentPoints, onNavi
               <div className="space-y-4">
                 <input type="text" placeholder="Full Name" required value={orderFormData.name} className="w-full p-4 bg-gray-50 border border-gray-200 rounded-xl focus:border-brand-gold outline-none" onChange={e => setOrderFormData({...orderFormData, name: e.target.value})} />
                 <input type="tel" placeholder="WhatsApp Number" required value={orderFormData.phone} className="w-full p-4 bg-gray-50 border border-gray-200 rounded-xl focus:border-brand-gold outline-none" onChange={e => setOrderFormData({...orderFormData, phone: e.target.value})} />
-                <textarea 
-                  placeholder={orderFormData.type === 'delivery' ? "Delivery Address" : "Table/Cabin Pref (e.g. Near Window)"} 
-                  required 
-                  value={orderFormData.address}
-                  className="w-full p-4 bg-gray-50 border border-gray-200 rounded-xl focus:border-brand-gold outline-none h-24 resize-none" 
-                  onChange={e => setOrderFormData({...orderFormData, address: e.target.value})} 
-                />
-                <input type="text" placeholder="Special Instructions (e.g. Extra spicy)" value={orderFormData.notes} className="w-full p-4 bg-gray-50 border border-gray-200 rounded-xl focus:border-brand-gold outline-none" onChange={e => setOrderFormData({...orderFormData, notes: e.target.value})} />
+                <textarea placeholder={orderFormData.type === 'delivery' ? "Delivery Address" : "Table/Cabin Pref"} required value={orderFormData.address} className="w-full p-4 bg-gray-50 border border-gray-200 rounded-xl focus:border-brand-gold outline-none h-24 resize-none" onChange={e => setOrderFormData({...orderFormData, address: e.target.value})} />
               </div>
 
               <button type="submit" className="w-full py-5 bg-brand-gold text-brand-black font-bold uppercase tracking-[0.2em] rounded-xl shadow-xl hover:bg-brand-black hover:text-white transition-all transform active:scale-95">
-                {selectedPaymentMode === 'points' ? 'Order Using Points' : 'Place Real-Time Order'}
+                Place Real-Time Order
               </button>
             </form>
           </div>

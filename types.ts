@@ -1,5 +1,6 @@
 
 export interface MenuItem {
+  // Legacy Fields (kept for backward compatibility)
   name: string;
   description: string;
   price?: string;
@@ -8,6 +9,17 @@ export interface MenuItem {
   image?: string;
   categoryBackgroundImage?: string;
   itemBackgroundImage?: string;
+
+  // New Management Fields
+  itemName?: string;
+  priceNum?: number;
+  categoryType?: string; // e.g., Veg, Non-Veg, Jain, Special
+  backgroundImageUrl?: string; // Google Drive link
+  isAvailable?: boolean;
+  isRecommended?: boolean;
+  isNewItem?: boolean;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface CategoryConfig {
