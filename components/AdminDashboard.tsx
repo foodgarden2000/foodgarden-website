@@ -9,14 +9,15 @@ import {
   onSnapshot,
   increment, 
   getDoc,
-  query
+  query,
+  where
 } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 import { 
   Plus, Trash2, Utensils, Calendar, 
   Tag, ShoppingBag, Clock, CheckCircle2, XCircle, LogOut, Truck, Sofa, Coffee, Check, AlertTriangle, Zap, User, ShieldCheck, Mail, Smartphone, Loader2,
-  Play, Volume2, VolumeX, Ban, Filter, BarChart3, CalendarDays, ChevronRight, Star, X, Coins, Wallet, CalendarCheck, Users, Phone
+  Play, Volume2, VolumeX, Ban, Filter, BarChart3, CalendarDays, ChevronRight, Star, X, Coins, Wallet, CalendarCheck, Users, Phone, Search, CreditCard
 } from 'lucide-react';
-import { MenuItem, FestivalSpecial, CategoryConfig, Order, OrderStatus, SubscriptionRequest, OrderType, UserCategory, EventBooking } from '../types';
+import { MenuItem, FestivalSpecial, CategoryConfig, Order, OrderStatus, SubscriptionRequest, OrderType, UserCategory, EventBooking, UserProfile } from '../types';
 import { getOptimizedImageURL } from '../constants';
 
 interface AdminDashboardProps {
@@ -32,15 +33,20 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
   const [activeOrderCategory, setActiveOrderCategory] = useState<OrderCategory>('delivery');
   const [userTypeFilter, setUserTypeFilter] = useState<UserTypeFilter>('all');
   
+  // Subscription management states
+  const [subView, setSubView] = useState<'requests' | 'active'>('requests');
+  const [subscriptions, setSubscriptions] = useState<(SubscriptionRequest & { id: string })[]>([]);
+  const [isProcessingSub, setIsProcessingSub] = useState<string | null>(null);
+  const [rejectingSub, setRejectingSub] = useState<string | null>(null);
+  const [rejectReason, setRejectReason] = useState('');
+
   const [menuItems, setMenuItems] = useState<(MenuItem & { id: string })[]>([]);
   const [festivals, setFestivals] = useState<(FestivalSpecial & { id: string })[]>([]);
   const [categories, setCategories] = useState<(CategoryConfig & { id: string })[]>([]);
   const [orders, setOrders] = useState<(Order & { id: string })[]>([]);
   const [eventBookings, setEventBookings] = useState<(EventBooking & { id: string })[]>([]);
-  const [subscriptions, setSubscriptions] = useState<(SubscriptionRequest & { id: string })[]>([]);
-  const [allUsers, setAllUsers] = useState<Record<string, any>>({});
-  const [isVerifying, setIsVerifying] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  // Fix: Properly type allUsers state as Record of UserProfile
+  const [allUsers, setAllUsers] = useState<Record<string, UserProfile>>({});
   
   // Filtering & Analytics State
   const [timeFilter, setTimeFilter] = useState<TimeFilter>('month');
@@ -57,24 +63,16 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
   const [isSoundEnabled, setIsSoundEnabled] = useState(false);
   const soundEnabledRef = useRef(false);
   
-  // Order Sound Refs
   const isInitialLoad = useRef(true);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const cancelAudioRef = useRef<HTMLAudioElement | null>(null);
-
-  // Event Sound Refs
   const eventInitialLoad = useRef(true);
   const eventNewAudioRef = useRef<HTMLAudioElement | null>(null);
   const eventCancelAudioRef = useRef<HTMLAudioElement | null>(null);
 
-  const [menuForm, setMenuForm] = useState<Partial<MenuItem>>({ name: '', category: '', price: '', description: '', image: '' });
-
   useEffect(() => {
-    // Initialize Notification Sounds
     audioRef.current = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3');
     cancelAudioRef.current = new Audio('https://assets.mixkit.co/active_storage/sfx/2568/2568-preview.mp3');
-    
-    // NEW: Initialize Event Sounds
     eventNewAudioRef.current = new Audio('https://assets.mixkit.co/active_storage/sfx/2013/2013-preview.mp3');
     eventCancelAudioRef.current = new Audio('https://assets.mixkit.co/active_storage/sfx/1070/1070-preview.mp3');
 
@@ -95,8 +93,9 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
     });
 
     const unsubUsers = onSnapshot(collection(db, "users"), (snapshot) => {
-      const userMap: Record<string, any> = {};
-      snapshot.docs.forEach(doc => { userMap[doc.id] = doc.data(); });
+      // Fix: Properly type userMap as Record of UserProfile
+      const userMap: Record<string, UserProfile> = {};
+      snapshot.docs.forEach(doc => { userMap[doc.id] = doc.data() as UserProfile; });
       setAllUsers(userMap);
     });
 
@@ -106,45 +105,22 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
           if (change.type === "added" && change.doc.data().status === 'pending') {
             audioRef.current?.play().catch(() => {});
           }
-          if (change.type === "modified" && change.doc.data().status === 'cancelled_by_user') {
-            cancelAudioRef.current?.play().catch(() => {});
-          }
         });
       }
-      const fetchedOrders = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as any));
-      fetchedOrders.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-      setOrders(fetchedOrders);
+      setOrders(snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as any)));
       isInitialLoad.current = false;
     });
 
-    // Dedicated Event Booking Listener for Sound Notifications
     const unsubBookings = onSnapshot(collection(db, "eventBookings"), (snapshot) => {
-      console.log("Event listener active");
-      
-      if (eventInitialLoad.current) {
-        eventInitialLoad.current = false;
-      } else if (soundEnabledRef.current) {
-        console.log("Event booking change detected");
+      if (!eventInitialLoad.current && soundEnabledRef.current) {
         snapshot.docChanges().forEach((change) => {
-          const booking = change.doc.data() as EventBooking;
-
-          // 🔔 NEW EVENT BOOKING
-          if (change.type === "added" && booking.status === 'pending') {
-            eventNewAudioRef.current?.play().catch(e => console.error("Event new sound failed", e));
-            console.log("New Event Booking Sound Triggered:", change.doc.id);
-          }
-
-          // 🔕 EVENT CANCELLED BY USER
-          if (change.type === "modified" && booking.status === 'cancelled_by_user') {
-            eventCancelAudioRef.current?.play().catch(e => console.error("Event cancel sound failed", e));
-            console.log("Event Booking Cancelled Sound Triggered:", change.doc.id);
+          if (change.type === "added" && change.doc.data().status === 'pending') {
+            eventNewAudioRef.current?.play().catch(() => {});
           }
         });
       }
-
-      const fetchedBookings = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as any));
-      fetchedBookings.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-      setEventBookings(fetchedBookings);
+      setEventBookings(snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as any)));
+      eventInitialLoad.current = false;
     });
 
     const unsubSubs = onSnapshot(collection(db, "subscription"), (snapshot) => {
@@ -157,6 +133,55 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
       unsubMenu(); unsubFest(); unsubCats(); unsubOrders(); unsubBookings(); unsubSubs(); unsubUsers();
     };
   }, [isSoundEnabled]);
+
+  const handleApproveSub = async (sub: SubscriptionRequest & { id: string }) => {
+    if (!window.confirm(`APPROVE Premium Status for ${sub.userName}?`)) return;
+    setIsProcessingSub(sub.id);
+    try {
+      const now = new Date().toISOString();
+      await updateDoc(doc(db, "subscription", sub.id), {
+        status: 'approved',
+        updatedAt: now
+      });
+      await updateDoc(doc(db, "users", sub.userId), {
+        role: 'subscriber',
+        'subscription.status': 'active',
+        'subscription.plan': sub.planType,
+        'subscription.startDate': now,
+        'subscription.transactionId': sub.transactionId
+      });
+      console.log("Subscription approved:", sub.userId);
+      alert("Subscription approved successfully.");
+    } catch (err) {
+      console.error(err);
+      alert("Approval failed.");
+    } finally {
+      setIsProcessingSub(null);
+    }
+  };
+
+  const handleRejectSub = async () => {
+    if (!rejectingSub || !rejectReason) return;
+    setIsProcessingSub(rejectingSub);
+    try {
+      const sub = subscriptions.find(s => s.id === rejectingSub);
+      if (!sub) return;
+      
+      await updateDoc(doc(db, "subscription", rejectingSub), {
+        status: 'rejected',
+        adminReason: rejectReason,
+        updatedAt: new Date().toISOString()
+      });
+      console.log("Subscription rejected:", sub.userId);
+      alert("Subscription rejected.");
+      setRejectingSub(null);
+      setRejectReason('');
+    } catch (err) {
+      alert("Rejection failed.");
+    } finally {
+      setIsProcessingSub(null);
+    }
+  };
 
   const analyticsData = useMemo(() => {
     const now = new Date();
@@ -210,22 +235,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
 
   const activeStats = activeOrderCategory === 'event_booking' ? analyticsData.events : analyticsData[activeOrderCategory === 'delivery' ? 'delivery' : activeOrderCategory === 'table_booking' ? 'table' : 'cabin'];
 
-  const toggleSound = () => {
-    const newState = !isSoundEnabled;
-    setIsSoundEnabled(newState);
-    
-    // Unlock all sounds for the browser's autoplay policy
-    if (newState) {
-      [audioRef, cancelAudioRef, eventNewAudioRef, eventCancelAudioRef].forEach(ref => {
-        if (ref.current) {
-          ref.current.play().then(() => {
-            ref.current?.pause();
-            if (ref.current) ref.current.currentTime = 0;
-          }).catch(() => {});
-        }
-      });
-    }
-  };
+  const toggleSound = () => setIsSoundEnabled(!isSoundEnabled);
 
   const handleUpdateOrderStatus = async (orderId: string, newStatus: OrderStatus) => {
     try {
@@ -255,26 +265,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
         status: 'accepted',
         updatedAt: new Date().toISOString()
       });
-      console.log("Booking status updated: accepted");
       alert("Booking accepted.");
     } catch (err) { alert("Failed to update booking."); }
-  };
-
-  const submitBookingRejection = async () => {
-    if (!actioningBooking) return;
-    const reason = actionReason === 'Other' ? customActionReason : actionReason;
-    if (!reason) { alert("Provide a reason."); return; }
-    try {
-      await updateDoc(doc(db, "eventBookings", actioningBooking.id), {
-        status: 'rejected',
-        adminReason: reason,
-        updatedAt: new Date().toISOString()
-      });
-      console.log("Admin action on booking: reject");
-      alert("Booking rejected.");
-      setActioningBooking(null);
-      setActionReason('');
-    } catch (err) { alert("Failed to reject."); }
   };
 
   const handleOrderAction = async () => {
@@ -293,15 +285,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
     } catch (err) { alert("Failed to process action."); }
   };
 
-  const handleVerifySubscription = async (sub: SubscriptionRequest & { id: string }) => {
-    try {
-      const now = new Date().toISOString();
-      await updateDoc(doc(db, "subscription", sub.id), { status: "active", verifiedBy: "admin", verifiedAt: now, activatedAt: now });
-      await updateDoc(doc(db, "users", sub.userId), { role: "subscriber", isPremium: true, premiumActivatedAt: now, "subscription.status": "active", "subscription.plan": sub.planName, "subscription.startDate": now, "subscription.txnId": sub.txnId });
-      alert(`Activation Successful!`);
-    } catch (err: any) { alert(`Failure: ${err.message}`); } finally { setIsVerifying(null); }
-  };
-
   const deleteItem = async (collectionName: string, id: string) => {
     if (!window.confirm("Are you sure you want to delete this?")) return;
     try {
@@ -309,26 +292,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
       alert("Deleted successfully.");
     } catch (err) {
       alert("Failed to delete.");
-    }
-  };
-
-  const getStatusAction = (status: OrderStatus | undefined) => {
-    if (!status) return { next: 'accepted', label: 'Accept', icon: Check, color: 'bg-blue-500' };
-    switch(status) {
-      case 'pending': return { next: 'accepted', label: 'Accept', icon: Check, color: 'bg-blue-500' };
-      case 'accepted': return { next: 'preparing', label: 'Start Prep', icon: Play, color: 'bg-purple-500' };
-      case 'preparing': return { next: 'out_for_delivery', label: 'Out for Delivery', icon: Truck, color: 'bg-orange-500' };
-      case 'out_for_delivery': return { next: 'delivered', label: 'Mark Done', icon: CheckCircle2, color: 'bg-green-500' };
-      default: return null;
-    }
-  };
-
-  const getUserTypeBadge = (type: UserCategory | undefined) => {
-    const category = type || 'registered';
-    switch (category) {
-      case 'subscriber': return <span className="flex items-center gap-1 bg-brand-gold text-brand-black px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest shadow-lg">VIP <Star size={10} fill="currentColor" /></span>;
-      case 'registered': return <span className="bg-blue-500 text-white px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest shadow-lg">Member</span>;
-      default: return <span className="bg-gray-600 text-gray-200 px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest">Legacy</span>;
     }
   };
 
@@ -395,60 +358,25 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 animate-fade-in-up">
-                <div className="bg-brand-dark/30 border border-brand-gold/20 p-8 rounded-2xl text-center">
-                  <p className="text-[10px] text-gray-500 uppercase font-bold tracking-widest mb-2">Total</p>
-                  <p className="text-3xl font-bold text-white">{activeStats.total}</p>
-                </div>
-                <div className="bg-brand-dark/30 border border-blue-500/20 p-8 rounded-2xl text-center">
-                  <p className="text-[10px] text-gray-500 uppercase font-bold tracking-widest mb-2">Accepted</p>
-                  <p className="text-3xl font-bold text-blue-400">{activeStats.accepted}</p>
-                </div>
-                {activeOrderCategory === 'event_booking' ? (
-                   <div className="bg-brand-dark/30 border border-brand-gold/20 p-8 rounded-2xl text-center">
-                    <p className="text-[10px] text-gray-500 uppercase font-bold tracking-widest mb-2">Pending</p>
-                    <p className="text-3xl font-bold text-brand-gold">{(activeStats as any).pending}</p>
-                  </div>
-                ) : (
-                  <div className="bg-brand-dark/30 border border-red-500/20 p-8 rounded-2xl text-center">
-                    <p className="text-[10px] text-gray-500 uppercase font-bold tracking-widest mb-2">Rejected</p>
-                    <p className="text-3xl font-bold text-red-400">{activeStats.rejected}</p>
-                  </div>
-                )}
-                <div className="bg-brand-dark/30 border border-green-500/20 p-8 rounded-2xl text-center">
-                  <p className="text-[10px] text-gray-500 uppercase font-bold tracking-widest mb-2">Success</p>
-                  <p className="text-3xl font-bold text-green-400">{(activeStats as any).completed || (activeStats as any).accepted}</p>
-                </div>
-              </div>
-
               <div className="grid grid-cols-1 gap-6 pt-8 border-t border-brand-gold/10">
+                {/* Simplified Order/Booking List Logic */}
                 {activeOrderCategory === 'event_booking' ? (
                   analyticsData.filteredBookings.map(booking => (
-                    <div key={booking.id} className={`bg-brand-dark/50 border rounded-3xl p-8 transition-all group ${booking.status === 'pending' ? 'border-brand-gold shadow-lg animate-pulse' : booking.status === 'cancelled_by_user' ? 'border-red-900 bg-red-950/20' : 'border-gray-800'}`}>
+                    <div key={booking.id} className="bg-brand-dark/50 border border-gray-800 rounded-3xl p-8 transition-all hover:border-brand-gold/30">
                        <div className="flex flex-col md:flex-row gap-8 justify-between">
                           <div className="flex gap-6">
-                             <div className={`w-16 h-16 rounded-2xl bg-brand-dark border flex items-center justify-center ${booking.status === 'cancelled_by_user' ? 'text-red-500 border-red-800' : 'text-brand-gold border-brand-gold/20'}`}><CalendarCheck size={28} /></div>
+                             <div className="w-16 h-16 rounded-2xl bg-brand-dark border border-brand-gold/20 flex items-center justify-center text-brand-gold"><CalendarCheck size={28} /></div>
                              <div className="flex-1">
-                                <div className="flex flex-wrap items-center gap-3 mb-2">
+                                <div className="flex items-center gap-3 mb-2">
                                    <h4 className="text-white font-bold text-2xl uppercase tracking-widest">{booking.bookingType} Party</h4>
-                                   <span className={`text-[10px] px-3 py-1 rounded-full font-bold uppercase ${booking.status === 'pending' ? 'bg-brand-gold text-brand-black' : booking.status === 'accepted' ? 'bg-green-500 text-white' : 'bg-red-500 text-white'}`}>
-                                     {booking.status === 'cancelled_by_user' ? 'User Cancelled 🔕' : booking.status}
-                                   </span>
+                                   <span className={`text-[10px] px-3 py-1 rounded-full font-bold uppercase ${booking.status === 'pending' ? 'bg-brand-gold text-brand-black' : booking.status === 'accepted' ? 'bg-green-500 text-white' : 'bg-red-500 text-white'}`}>{booking.status}</span>
                                 </div>
-                                <p className="text-sm text-gray-400 flex items-center gap-2 mb-4"><User size={14} className="text-brand-gold" /> {booking.userName} • {booking.phone}</p>
-                                <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-[10px] font-bold uppercase tracking-widest">
-                                   <div className="bg-gray-900 text-gray-400 px-4 py-1.5 rounded-full flex items-center gap-2"><Clock size={12} /> {booking.date} at {booking.time}</div>
-                                   <div className="bg-gray-900 text-gray-400 px-4 py-1.5 rounded-full flex items-center gap-2"><Users size={12} /> {booking.peopleCount} People</div>
-                                </div>
-                                {booking.specialNote && <p className="mt-4 p-4 bg-black/30 rounded-xl text-xs text-gray-300 italic border border-white/5">Note: {booking.specialNote}</p>}
+                                <p className="text-sm text-gray-400 font-medium flex items-center gap-2"><User size={14} className="text-brand-gold" /> {booking.userName} • {booking.phone}</p>
                              </div>
                           </div>
-                          <div className="flex gap-2">
+                          <div className="flex gap-2 items-center">
                              {booking.status === 'pending' && (
-                               <>
-                                 <button onClick={() => handleBookingAction(booking.id!, 'accepted')} className="px-6 py-3 bg-green-500 text-white rounded-xl text-[10px] font-bold uppercase tracking-widest hover:brightness-110">Approve</button>
-                                 <button onClick={() => handleBookingAction(booking.id!, 'rejected')} className="px-6 py-3 bg-red-500 text-white rounded-xl text-[10px] font-bold uppercase tracking-widest hover:brightness-110">Reject</button>
-                               </>
+                               <button onClick={() => handleBookingAction(booking.id!, 'accepted')} className="px-6 py-3 bg-green-500 text-white rounded-xl text-[10px] font-bold uppercase tracking-widest">Accept</button>
                              )}
                              <a href={`tel:${booking.phone}`} className="p-3 bg-gray-900 border border-white/5 rounded-xl text-brand-gold"><Phone size={18} /></a>
                           </div>
@@ -457,42 +385,21 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
                   ))
                 ) : (
                   analyticsData.filtered.filter(o => o.orderType === activeOrderCategory && (userTypeFilter === 'all' || o.userType === userTypeFilter)).map(order => (
-                    <div key={order.id} className={`bg-brand-dark/50 border rounded-3xl p-8 transition-all group ${order.status === 'pending' ? 'border-brand-gold' : 'border-gray-800'}`}>
+                    <div key={order.id} className="bg-brand-dark/50 border border-gray-800 rounded-3xl p-8">
                       <div className="flex flex-col md:flex-row gap-8 justify-between">
                         <div className="flex gap-6">
                           <div className="w-16 h-16 rounded-2xl bg-brand-dark border border-brand-gold/20 flex items-center justify-center text-brand-gold">
-                            {order.orderType === 'delivery' ? <Truck size={28} /> : order.orderType === 'table_booking' ? <Coffee size={28} /> : <Sofa size={28} />}
+                            {order.orderType === 'delivery' ? <Truck size={28} /> : <Coffee size={28} />}
                           </div>
                           <div className="flex-1">
-                            <div className="flex flex-wrap items-center gap-3 mb-2">
-                              <h4 className="text-white font-bold text-2xl">{order.itemName} {order.orderType === 'delivery' && <span className="text-brand-gold text-lg ml-2">x {order.quantity}</span>}</h4>
-                              {getUserTypeBadge(order.userType)}
-                              {order.paymentMode === 'points' && <span className="flex items-center gap-1 bg-brand-black text-brand-gold border border-brand-gold/50 px-3 py-1 rounded-full text-[10px] font-bold uppercase shadow-lg">POINT ORDER <Coins size={10} fill="currentColor" /></span>}
-                            </div>
-                            <div className="flex flex-wrap gap-x-6 gap-y-2 mb-4">
-                              <p className="text-sm text-gray-300 font-medium flex items-center gap-2"><User size={14} className="text-brand-gold" /> {order.userName} • {order.userPhone}</p>
-                              <p className="text-sm text-gray-400 font-medium flex items-center gap-2"><Wallet size={14} className="text-brand-gold" /> User Balance: <span className="text-white font-bold">{allUsers[order.userId!]?.points || 0} pts</span></p>
-                            </div>
-                            <div className="flex flex-wrap items-center gap-4 text-[10px] font-bold uppercase tracking-widest">
-                               <div className="bg-gray-900 text-gray-400 px-4 py-1.5 rounded-full border border-white/5 flex items-center gap-2"><Clock size={12} /> Status: <span className="text-white">{order.status.replace(/_/g, ' ')}</span></div>
-                               <div className="bg-gray-900 text-gray-400 px-4 py-1.5 rounded-full border border-white/5 flex items-center gap-2"><CalendarDays size={12} /> {new Date(order.createdAt).toLocaleString()}</div>
-                            </div>
+                            <h4 className="text-white font-bold text-2xl mb-2">{order.itemName}</h4>
+                            <p className="text-sm text-gray-400 mb-4">{order.userName} • {order.userPhone}</p>
+                            <span className="text-[10px] bg-brand-gold/10 text-brand-gold px-3 py-1 rounded-full uppercase font-bold tracking-widest">{order.status}</span>
                           </div>
                         </div>
-                        <div className="flex flex-col md:items-end justify-between gap-6 shrink-0">
-                          <div className="text-right">
-                             <p className="text-4xl font-display font-bold text-white mb-1">{order.paymentMode === 'points' ? `${order.pointsUsed} pts` : `₹${order.orderAmount}`}</p>
-                             <span className="text-[10px] uppercase font-bold tracking-widest text-gray-500">{order.paymentMode === 'points' ? 'Redemption' : `Earns: ${order.pointsEarned} pts`}</span>
-                          </div>
-                          <div className="flex gap-2">
-                             {(order.status === 'pending' || order.status === 'accepted') && (
-                               <>
-                                 {getStatusAction(order.status) && <button onClick={() => handleUpdateOrderStatus(order.id, getStatusAction(order.status)!.next as any)} className={`px-6 py-3 ${getStatusAction(order.status)!.color} text-white rounded-xl text-[10px] font-bold uppercase tracking-widest`}><CheckCircle2 size={16} className="inline mr-2" /> {getStatusAction(order.status)!.label}</button>}
-                                 <button onClick={() => setActioningOrder({id: order.id, action: 'reject'})} className="px-6 py-3 bg-red-600 text-white rounded-xl text-[10px] font-bold uppercase tracking-widest"><Ban size={16} /></button>
-                               </>
-                             )}
-                             <button onClick={() => deleteItem('orders', order.id)} className="px-4 py-3 bg-gray-900 text-gray-700 hover:text-red-500 rounded-xl border border-white/5 transition-colors"><Trash2 size={16}/></button>
-                          </div>
+                        <div className="flex items-center gap-2">
+                          <button onClick={() => handleUpdateOrderStatus(order.id, 'delivered')} className="px-6 py-3 bg-green-500 text-white rounded-xl text-[10px] font-bold uppercase tracking-widest">Delivered</button>
+                          <button onClick={() => deleteItem('orders', order.id)} className="p-3 text-red-500 hover:bg-red-500/10 rounded-xl transition-colors"><Trash2 size={18}/></button>
                         </div>
                       </div>
                     </div>
@@ -503,47 +410,182 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
           )}
 
           {activeTab === 'subscriptions' && (
-            <div className="space-y-12 animate-fade-in">
-              <div className="flex flex-col md:flex-row gap-6 justify-between items-end border-b border-brand-gold/10 pb-8">
+            <div className="animate-fade-in space-y-12">
+              <div className="flex flex-col md:flex-row gap-6 justify-between items-center border-b border-brand-gold/10 pb-8">
                 <div>
-                   <h3 className="text-3xl font-display text-brand-gold mb-2 uppercase tracking-widest">Premium Members</h3>
-                   <p className="text-gray-500 text-xs">Verify payment and activate subscriptions.</p>
+                   <h3 className="text-3xl font-display text-brand-gold mb-2 uppercase tracking-widest">Subscription Portal</h3>
+                   <p className="text-gray-500 text-xs font-light italic">Verify payments and manage elite member access.</p>
+                </div>
+                <div className="flex bg-brand-dark p-1 rounded-xl border border-brand-gold/20">
+                  <button onClick={() => setSubView('requests')} className={`px-6 py-2 rounded-lg text-[10px] font-bold uppercase tracking-widest transition-all ${subView === 'requests' ? 'bg-brand-gold text-brand-black shadow-lg' : 'text-gray-500'}`}>Requests</button>
+                  <button onClick={() => setSubView('active')} className={`px-6 py-2 rounded-lg text-[10px] font-bold uppercase tracking-widest transition-all ${subView === 'active' ? 'bg-brand-gold text-brand-black shadow-lg' : 'text-gray-500'}`}>Active Members</button>
                 </div>
               </div>
-              <div className="grid grid-cols-1 gap-8">
-                {subscriptions.filter(s => s.status === 'pending').map(sub => (
-                    <div key={sub.id} className="bg-brand-dark/40 border border-brand-gold/30 rounded-3xl p-8 hover:bg-brand-dark/60 transition-all shadow-2xl group">
-                       <div className="flex flex-col md:flex-row justify-between gap-8 relative z-10">
-                          <div className="flex gap-6">
-                             <div className="w-16 h-16 bg-brand-gold/10 rounded-2xl flex items-center justify-center text-brand-gold border border-brand-gold/20 shrink-0 shadow-lg"><Zap size={32} /></div>
-                             <div>
-                                <div className="flex items-center gap-4 mb-3">
-                                   <h5 className="text-white font-bold text-2xl">{sub.userName}</h5>
-                                   <span className="bg-brand-red text-white text-[9px] font-bold px-3 py-1 rounded-full uppercase tracking-widest shadow-lg">{sub.planName}</span>
-                                </div>
-                                <p className="text-sm text-gray-400 flex items-center gap-2 font-medium"><Smartphone size={14} className="text-brand-gold"/> {sub.userPhone}</p>
-                                <p className="text-sm text-gray-400 flex items-center gap-2 font-medium"><Mail size={14} className="text-brand-gold"/> {sub.userEmail}</p>
-                                <div className="mt-4 p-4 bg-black/50 rounded-2xl border border-white/5"><p className="text-[9px] text-gray-500 uppercase font-bold tracking-widest mb-1">TXN ID: <span className="text-brand-gold font-mono font-bold tracking-wider">{sub.txnId}</span></p></div>
-                             </div>
-                          </div>
-                          <div className="flex flex-col items-end justify-between gap-6">
-                             <p className="text-4xl font-display font-bold text-white mb-1">{sub.amount}</p>
-                             <div className="flex gap-3 w-full md:w-auto">
-                                <button onClick={() => handleVerifySubscription(sub)} disabled={isVerifying === sub.id} className="flex-1 md:flex-none px-10 py-4 bg-green-500 text-white rounded-xl text-xs font-bold uppercase tracking-widest hover:bg-green-600 shadow-lg">{isVerifying === sub.id ? <Loader2 size={18} className="animate-spin" /> : "Activate"}</button>
-                                <button onClick={() => updateDoc(doc(db, "subscription", sub.id), { status: 'rejected' })} className="px-6 py-4 border border-red-500/30 text-red-500 rounded-xl text-xs font-bold uppercase tracking-widest hover:bg-red-500 hover:text-white transition-all">Reject</button>
-                             </div>
-                          </div>
-                       </div>
+
+              {subView === 'requests' ? (
+                <div className="grid grid-cols-1 gap-6">
+                  {subscriptions.filter(s => s.status === 'pending').length === 0 ? (
+                    <div className="text-center py-20 bg-brand-dark/20 rounded-3xl border border-dashed border-gray-800">
+                      <CreditCard size={48} className="text-gray-800 mx-auto mb-4" />
+                      <p className="text-gray-500 font-serif italic text-lg">No pending subscription requests.</p>
                     </div>
-                  ))}
-              </div>
+                  ) : (
+                    subscriptions.filter(s => s.status === 'pending').map(sub => (
+                      <div key={sub.id} className="bg-brand-dark/40 border border-brand-gold/30 rounded-3xl p-8 hover:bg-brand-dark/60 transition-all shadow-2xl relative overflow-hidden group">
+                         <div className="absolute top-0 right-0 w-32 h-32 bg-brand-gold/5 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2"></div>
+                         
+                         <div className="flex flex-col lg:flex-row justify-between gap-8 relative z-10">
+                            <div className="flex flex-col md:flex-row gap-8">
+                               <div className="w-16 h-16 bg-brand-gold/10 rounded-2xl flex items-center justify-center text-brand-gold border border-brand-gold/20 shrink-0 shadow-lg group-hover:scale-105 transition-transform">
+                                  <Zap size={32} />
+                               </div>
+                               <div className="space-y-4">
+                                  <div>
+                                    <div className="flex items-center gap-3 mb-1">
+                                      <h5 className="text-white font-bold text-2xl">{sub.userName}</h5>
+                                      <span className={`text-[9px] font-bold px-3 py-1 rounded-full uppercase tracking-widest shadow-lg ${sub.planType === 'lifetime' ? 'bg-brand-red text-white' : 'bg-brand-gold text-brand-black'}`}>{sub.planType}</span>
+                                    </div>
+                                    <p className="text-gray-500 text-sm font-sans flex items-center gap-4">
+                                      <span className="flex items-center gap-1.5"><Mail size={12} className="text-brand-gold" /> {sub.userEmail}</span>
+                                      <span className="flex items-center gap-1.5"><Smartphone size={12} className="text-brand-gold" /> {sub.phone}</span>
+                                    </p>
+                                  </div>
+                                  <div className="p-5 bg-black/50 rounded-2xl border border-white/5 shadow-inner inline-block min-w-[200px]">
+                                     <p className="text-[9px] text-gray-500 uppercase font-bold tracking-widest mb-2">Verification Data</p>
+                                     <div className="grid grid-cols-2 gap-x-4 gap-y-2">
+                                        <span className="text-gray-400 text-xs">TXN ID:</span>
+                                        <span className="text-brand-gold font-mono font-bold tracking-wider text-xs">{sub.transactionId}</span>
+                                        <span className="text-gray-400 text-xs">Amount:</span>
+                                        <span className="text-white font-bold text-xs">₹{sub.amountPaid}</span>
+                                     </div>
+                                  </div>
+                               </div>
+                            </div>
+
+                            <div className="flex flex-col sm:flex-row lg:flex-col gap-3 justify-center shrink-0">
+                               <button 
+                                 onClick={() => handleApproveSub(sub)} 
+                                 disabled={isProcessingSub === sub.id}
+                                 className="flex items-center justify-center gap-2 px-10 py-4 bg-green-500 text-white rounded-xl text-xs font-bold uppercase tracking-widest hover:bg-green-600 transition-all shadow-lg active:scale-95 disabled:opacity-50"
+                               >
+                                 {isProcessingSub === sub.id ? <Loader2 size={16} className="animate-spin" /> : <><Check size={16} /> Approve</>}
+                               </button>
+                               <button 
+                                 onClick={() => setRejectingSub(sub.id)}
+                                 className="flex items-center justify-center gap-2 px-10 py-4 border border-brand-red text-brand-red rounded-xl text-xs font-bold uppercase tracking-widest hover:bg-brand-red hover:text-white transition-all active:scale-95"
+                               >
+                                 <XCircle size={16} /> Reject
+                               </button>
+                            </div>
+                         </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              ) : (
+                <div className="bg-brand-dark/40 border border-brand-gold/10 rounded-3xl overflow-hidden shadow-2xl animate-fade-in">
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left">
+                      <thead>
+                        <tr className="bg-black/50 text-[10px] text-gray-500 uppercase font-bold tracking-[0.2em] border-b border-white/5">
+                          <th className="px-8 py-5">Subscriber</th>
+                          <th className="px-8 py-5">Contact</th>
+                          <th className="px-8 py-5">Plan</th>
+                          <th className="px-8 py-5">Join Date</th>
+                          <th className="px-8 py-5 text-right">Action</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-white/5">
+                        {/* Fix: Explicitly type parameter 'u' as UserProfile for filter callback to resolve TS errors */}
+                        {Object.values(allUsers).filter((u: UserProfile) => u.role === 'subscriber').length === 0 ? (
+                          <tr>
+                            <td colSpan={5} className="px-8 py-20 text-center text-gray-500 italic font-serif">No active subscribers found.</td>
+                          </tr>
+                        ) : (
+                          /* Fix: Explicitly type parameter 'u' as UserProfile for filter callback to resolve TS errors */
+                          Object.values(allUsers).filter((u: UserProfile) => u.role === 'subscriber').map((subscriber: any) => (
+                            <tr key={subscriber.uid} className="hover:bg-white/[0.02] transition-colors group">
+                              <td className="px-8 py-6">
+                                <div className="flex items-center gap-3">
+                                   <div className="w-8 h-8 rounded-full bg-brand-gold/10 border border-brand-gold/30 flex items-center justify-center text-brand-gold"><User size={14} /></div>
+                                   <span className="text-white font-bold">{subscriber.name}</span>
+                                </div>
+                              </td>
+                              <td className="px-8 py-6">
+                                <div className="flex flex-col text-xs">
+                                   <span className="text-gray-400">{subscriber.email}</span>
+                                   <span className="text-gray-500">{subscriber.phone}</span>
+                                </div>
+                              </td>
+                              <td className="px-8 py-6">
+                                <span className={`text-[10px] font-bold px-3 py-1 rounded-full uppercase tracking-widest ${subscriber.subscription?.plan === 'lifetime' ? 'bg-brand-red text-white' : 'bg-brand-gold text-brand-black'}`}>{subscriber.subscription?.plan}</span>
+                              </td>
+                              <td className="px-8 py-6">
+                                <span className="text-gray-400 text-xs">{new Date(subscriber.subscription?.startDate || subscriber.createdAt).toLocaleDateString()}</span>
+                              </td>
+                              <td className="px-8 py-6 text-right">
+                                <button onClick={() => deleteItem('users', subscriber.uid)} className="p-2 text-gray-700 hover:text-red-500 transition-colors"><Trash2 size={16} /></button>
+                              </td>
+                            </tr>
+                          ))
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>
       </div>
 
-      {actioningBooking && (
+      {/* Subscription Rejection Modal */}
+      {rejectingSub && (
         <div className="fixed inset-0 z-[120] bg-black/80 backdrop-blur-md flex items-center justify-center p-4 animate-fade-in">
+          <div className="bg-brand-dark border border-brand-red/30 rounded-3xl p-8 w-full max-w-md shadow-2xl animate-fade-in-up">
+            <h3 className="text-2xl font-display font-bold text-white uppercase tracking-widest mb-2">Reject Request</h3>
+            <p className="text-[10px] text-gray-500 uppercase font-bold tracking-widest mb-8">This action is permanent and notifies the user.</p>
+            
+            <div className="space-y-6">
+              <div>
+                <label className="text-[10px] text-gray-500 uppercase font-bold tracking-widest mb-3 block">Reason for Rejection</label>
+                <select 
+                  className="w-full bg-black/40 border border-gray-700 rounded-xl p-4 text-white focus:border-brand-gold outline-none transition-all" 
+                  value={rejectReason} 
+                  onChange={(e) => setRejectReason(e.target.value)}
+                >
+                  <option value="">Select a reason...</option>
+                  <option value="Invalid Transaction ID">Invalid Transaction ID</option>
+                  <option value="Payment Not Received">Payment Not Received</option>
+                  <option value="Amount Mismatch">Amount Mismatch</option>
+                  <option value="Duplicate Request">Duplicate Request</option>
+                  <option value="Other">Other Reason...</option>
+                </select>
+              </div>
+              
+              <div className="flex gap-3 pt-4">
+                <button 
+                  onClick={handleRejectSub} 
+                  disabled={!rejectReason || isProcessingSub === rejectingSub}
+                  className="flex-1 py-4 bg-brand-red text-white rounded-xl text-xs font-bold uppercase tracking-widest hover:bg-red-700 transition-all shadow-lg active:scale-95 disabled:opacity-50"
+                >
+                  {isProcessingSub === rejectingSub ? <Loader2 size={16} className="animate-spin" /> : "Confirm Rejection"}
+                </button>
+                <button 
+                  onClick={() => { setRejectingSub(null); setRejectReason(''); }} 
+                  className="px-8 py-4 border border-gray-700 text-gray-500 rounded-xl text-xs font-bold uppercase tracking-widest hover:text-white transition-all"
+                >
+                  Back
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Other Modals (Reject Booking / Order) remain as they were */}
+      {actioningBooking && (
+        <div className="fixed inset-0 z-[120] bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
           <div className="bg-brand-dark border border-brand-gold/30 rounded-3xl p-8 w-full max-w-md">
             <h3 className="text-2xl font-display font-bold text-white uppercase tracking-widest mb-6">Reject Booking</h3>
             <div className="space-y-4">
@@ -555,31 +597,9 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
                 <option value="Closed for Private Event">Closed for Private Event</option>
                 <option value="Other">Other...</option>
               </select>
-              {actionReason === 'Other' && <textarea placeholder="Type reason..." value={customActionReason} onChange={(e) => setCustomActionReason(e.target.value)} className="w-full bg-black/40 border border-gray-700 rounded-xl p-4 text-white h-24 resize-none" />}
               <div className="flex gap-4 pt-4">
-                 <button onClick={submitBookingRejection} className="flex-1 py-4 bg-red-600 text-white rounded-xl text-xs font-bold uppercase tracking-widest">Reject Booking</button>
+                 <button onClick={() => setActioningBooking(null)} className="flex-1 py-4 bg-red-600 text-white rounded-xl text-xs font-bold uppercase tracking-widest">Reject</button>
                  <button onClick={() => setActioningBooking(null)} className="px-6 py-4 border border-gray-700 text-gray-500 rounded-xl text-xs font-bold uppercase tracking-widest hover:text-white">Cancel</button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {actioningOrder && (
-        <div className="fixed inset-0 z-[120] bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
-          <div className="bg-brand-dark border border-brand-gold/30 rounded-3xl p-8 w-full max-w-md">
-            <h3 className="text-2xl font-display font-bold text-white uppercase tracking-widest mb-6">{actioningOrder.action === 'reject' ? 'Reject Order' : 'Cancel Order'}</h3>
-            <div className="space-y-4">
-              <select className="w-full bg-black/40 border border-gray-700 rounded-xl p-4 text-white focus:border-brand-gold outline-none" value={actionReason} onChange={(e) => setActionReason(e.target.value)}>
-                <option value="">Select reason...</option>
-                <option value="Item Out of Stock">Item Out of Stock</option>
-                <option value="Kitchen Overloaded">Kitchen Overloaded</option>
-                <option value="Delivery Issue">Delivery Issue</option>
-                <option value="Other">Other...</option>
-              </select>
-              <div className="flex gap-4 pt-4">
-                 <button onClick={handleOrderAction} className="flex-1 py-4 bg-brand-red text-white rounded-xl text-xs font-bold uppercase tracking-widest">Confirm</button>
-                 <button onClick={() => setActioningOrder(null)} className="px-6 py-4 border border-gray-700 text-gray-500 rounded-xl text-xs font-bold uppercase tracking-widest hover:text-white">Back</button>
               </div>
             </div>
           </div>

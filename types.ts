@@ -76,9 +76,9 @@ export interface UserProfile {
   createdAt: string;
   subscription?: {
     status: 'active' | 'rejected' | 'pending';
-    plan: string;
+    plan: 'yearly' | 'lifetime';
     startDate: string;
-    txnId?: string;
+    transactionId?: string;
   };
 }
 
@@ -87,13 +87,14 @@ export interface SubscriptionRequest {
   userId: string;
   userName: string;
   userEmail: string;
-  userPhone: string;
-  planName: string;
-  amount: string;
-  txnId: string;
-  status: 'pending' | 'active' | 'rejected';
+  phone: string;
+  transactionId: string;
+  planType: 'yearly' | 'lifetime';
+  amountPaid: number;
+  status: 'pending' | 'approved' | 'rejected';
+  adminReason?: string;
   createdAt: string;
-  activatedAt?: string;
+  updatedAt: string;
 }
 
 export interface Referral {
