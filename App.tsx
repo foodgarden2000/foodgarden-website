@@ -163,12 +163,13 @@ const App: React.FC = () => {
           </>
         )}
 
-        {currentView === 'dashboard' && (
+        {(currentView === 'dashboard' || currentView === 'admin') && (
           <Dashboard 
             user={user} 
             points={points} 
             onBack={() => navigateTo('home')} 
             adminMode={isAdmin}
+            adminOnlyRequest={currentView === 'admin'}
             referralCodeFromUrl={capturedReferralCode}
           />
         )}

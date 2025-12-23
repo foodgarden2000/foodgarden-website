@@ -25,12 +25,13 @@ interface DashboardProps {
   points: number;
   onBack: () => void;
   adminMode?: boolean;
+  adminOnlyRequest?: boolean;
   referralCodeFromUrl?: string | null;
 }
 
 type SubStep = 'IDLE' | 'PAYING' | 'CONFIRMING' | 'VERIFYING';
 
-const Dashboard: React.FC<DashboardProps> = ({ user, points, onBack, adminMode, referralCodeFromUrl }) => {
+const Dashboard: React.FC<DashboardProps> = ({ user, points, onBack, adminMode, adminOnlyRequest, referralCodeFromUrl }) => {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [myOrders, setMyOrders] = useState<Order[]>([]);
   const [activeTab, setActiveTab] = useState<'profile' | 'orders' | 'subscription'>('orders');
@@ -167,7 +168,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, points, onBack, adminMode, 
   };
 
   if (!user) {
-    return <Auth externalReferralCode={referralCodeFromUrl} />;
+    return <Auth adminOnly={adminOnlyRequest} externalReferralCode={referralCodeFromUrl} />;
   }
 
   return (

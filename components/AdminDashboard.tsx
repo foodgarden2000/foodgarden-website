@@ -13,7 +13,7 @@ import {
 import { 
   Plus, Trash2, Utensils, Calendar, 
   Tag, ShoppingBag, Clock, CheckCircle2, XCircle, LogOut, Truck, Sofa, Coffee, Check, AlertTriangle, Zap, User, ShieldCheck, Mail, Smartphone, Loader2,
-  Play, Volume2, VolumeX, Ban, Filter, BarChart3, CalendarDays, ChevronRight, Star
+  Play, Volume2, VolumeX, Ban, Filter, BarChart3, CalendarDays, ChevronRight, Star, X
 } from 'lucide-react';
 import { MenuItem, FestivalSpecial, CategoryConfig, Order, OrderStatus, SubscriptionRequest, OrderType, UserCategory } from '../types';
 import { getOptimizedImageURL } from '../constants';
@@ -670,6 +670,67 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
           )}
         </div>
       </div>
+
+      {/* Action Modals (Reject / Cancel) */}
+      {actioningOrder && (
+        <div className="fixed inset-0 z-[120] bg-black/80 backdrop-blur-md flex items-center justify-center p-4 animate-fade-in">
+          <div className="bg-brand-dark border border-brand-gold/30 rounded-3xl p-8 w-full max-w-md shadow-2xl animate-fade-in-up">
+            <div className="flex items-center gap-4 mb-8 text-brand-red">
+              <div className="w-12 h-12 bg-red-500/10 rounded-xl flex items-center justify-center border border-red-500/20">
+                {actioningOrder.action === 'reject' ? <Ban size={24} /> : <XCircle size={24} />}
+              </div>
+              <div>
+                <h3 className="text-2xl font-display font-bold uppercase tracking-widest text-white">{actioningOrder.action === 'reject' ? 'Reject Order' : 'Cancel Order'}</h3>
+                <p className="text-[10px] text-gray-500 uppercase tracking-widest font-bold">Staff Override Required</p>
+              </div>
+            </div>
+            
+            <div className="space-y-6">
+              <div>
+                <label className="text-[10px] text-gray-500 uppercase font-bold tracking-widest mb-3 block">Reason for {actioningOrder.action === 'reject' ? 'Rejection' : 'Cancellation'}</label>
+                <select 
+                  className="w-full bg-black/40 border border-gray-700 rounded-xl p-4 text-white focus:border-brand-gold outline-none transition-all" 
+                  value={actionReason} 
+                  onChange={(e) => setActionReason(e.target.value)}
+                >
+                  <option value="">Select a standard reason...</option>
+                  <option value="Item Out of Stock">Item Out of Stock</option>
+                  <option value="Kitchen Overloaded">Kitchen Overloaded</option>
+                  <option value="Closing Soon">Closing Soon</option>
+                  <option value="Delivery Partner Unavailable">Delivery Partner Unavailable</option>
+                  <option value="Incorrect Pricing/Info">Incorrect Pricing/Info</option>
+                  <option value="Address Outside Delivery Zone">Outside Zone</option>
+                  <option value="Other">Other Reason...</option>
+                </select>
+              </div>
+
+              {actionReason === 'Other' && (
+                <textarea 
+                  placeholder="Type specific reason here..." 
+                  className="w-full bg-black/40 border border-gray-700 rounded-xl p-4 text-white focus:border-brand-gold outline-none transition-all h-24 resize-none" 
+                  value={customActionReason} 
+                  onChange={(e) => setCustomActionReason(e.target.value)} 
+                />
+              )}
+
+              <div className="flex gap-3 pt-4">
+                <button 
+                  onClick={handleOrderAction} 
+                  className="flex-1 py-4 bg-brand-red text-white rounded-xl text-xs font-bold uppercase tracking-widest hover:bg-red-700 transition-all shadow-lg active:scale-95"
+                >
+                  Confirm {actioningOrder.action}
+                </button>
+                <button 
+                  onClick={() => { setActioningOrder(null); setActionReason(''); setCustomActionReason(''); }} 
+                  className="px-8 py-4 border border-gray-700 text-gray-500 rounded-xl text-xs font-bold uppercase tracking-widest hover:text-white transition-all"
+                >
+                  Back
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
