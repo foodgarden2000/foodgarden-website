@@ -8,7 +8,8 @@ import {
   doc, 
   onSnapshot,
   increment, 
-  getDoc
+  getDoc,
+  query
 } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 import { 
   Plus, Trash2, Utensils, Calendar, 
@@ -55,17 +56,28 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
   // Sound Notification States
   const [isSoundEnabled, setIsSoundEnabled] = useState(false);
   const soundEnabledRef = useRef(false);
+  
+  // Order Sound Refs
   const isInitialLoad = useRef(true);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const cancelAudioRef = useRef<HTMLAudioElement | null>(null);
 
+  // Event Sound Refs
+  const eventInitialLoad = useRef(true);
+  const eventNewAudioRef = useRef<HTMLAudioElement | null>(null);
+  const eventCancelAudioRef = useRef<HTMLAudioElement | null>(null);
+
   const [menuForm, setMenuForm] = useState<Partial<MenuItem>>({ name: '', category: '', price: '', description: '', image: '' });
 
   useEffect(() => {
+    // Initialize Notification Sounds
     audioRef.current = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3');
-    audioRef.current.preload = 'auto';
     cancelAudioRef.current = new Audio('https://assets.mixkit.co/active_storage/sfx/2568/2568-preview.mp3');
-    cancelAudioRef.current.preload = 'auto';
+    
+    // NEW: Initialize Event Sounds
+    eventNewAudioRef.current = new Audio('https://assets.mixkit.co/active_storage/sfx/2013/2013-preview.mp3');
+    eventCancelAudioRef.current = new Audio('https://assets.mixkit.co/active_storage/sfx/1070/1070-preview.mp3');
+
     soundEnabledRef.current = isSoundEnabled;
 
     const unsubMenu = onSnapshot(collection(db, "menu"), (snapshot) => {
@@ -105,7 +117,31 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
       isInitialLoad.current = false;
     });
 
+    // Dedicated Event Booking Listener for Sound Notifications
     const unsubBookings = onSnapshot(collection(db, "eventBookings"), (snapshot) => {
+      console.log("Event listener active");
+      
+      if (eventInitialLoad.current) {
+        eventInitialLoad.current = false;
+      } else if (soundEnabledRef.current) {
+        console.log("Event booking change detected");
+        snapshot.docChanges().forEach((change) => {
+          const booking = change.doc.data() as EventBooking;
+
+          // 🔔 NEW EVENT BOOKING
+          if (change.type === "added" && booking.status === 'pending') {
+            eventNewAudioRef.current?.play().catch(e => console.error("Event new sound failed", e));
+            console.log("New Event Booking Sound Triggered:", change.doc.id);
+          }
+
+          // 🔕 EVENT CANCELLED BY USER
+          if (change.type === "modified" && booking.status === 'cancelled_by_user') {
+            eventCancelAudioRef.current?.play().catch(e => console.error("Event cancel sound failed", e));
+            console.log("Event Booking Cancelled Sound Triggered:", change.doc.id);
+          }
+        });
+      }
+
       const fetchedBookings = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as any));
       fetchedBookings.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
       setEventBookings(fetchedBookings);
@@ -174,7 +210,22 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
 
   const activeStats = activeOrderCategory === 'event_booking' ? analyticsData.events : analyticsData[activeOrderCategory === 'delivery' ? 'delivery' : activeOrderCategory === 'table_booking' ? 'table' : 'cabin'];
 
-  const toggleSound = () => setIsSoundEnabled(!isSoundEnabled);
+  const toggleSound = () => {
+    const newState = !isSoundEnabled;
+    setIsSoundEnabled(newState);
+    
+    // Unlock all sounds for the browser's autoplay policy
+    if (newState) {
+      [audioRef, cancelAudioRef, eventNewAudioRef, eventCancelAudioRef].forEach(ref => {
+        if (ref.current) {
+          ref.current.play().then(() => {
+            ref.current?.pause();
+            if (ref.current) ref.current.currentTime = 0;
+          }).catch(() => {});
+        }
+      });
+    }
+  };
 
   const handleUpdateOrderStatus = async (orderId: string, newStatus: OrderStatus) => {
     try {
@@ -251,7 +302,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
     } catch (err: any) { alert(`Failure: ${err.message}`); } finally { setIsVerifying(null); }
   };
 
-  // Implementation of missing deleteItem helper
   const deleteItem = async (collectionName: string, id: string) => {
     if (!window.confirm("Are you sure you want to delete this?")) return;
     try {
@@ -374,14 +424,16 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
               <div className="grid grid-cols-1 gap-6 pt-8 border-t border-brand-gold/10">
                 {activeOrderCategory === 'event_booking' ? (
                   analyticsData.filteredBookings.map(booking => (
-                    <div key={booking.id} className={`bg-brand-dark/50 border rounded-3xl p-8 transition-all group ${booking.status === 'pending' ? 'border-brand-gold shadow-lg' : 'border-gray-800'}`}>
+                    <div key={booking.id} className={`bg-brand-dark/50 border rounded-3xl p-8 transition-all group ${booking.status === 'pending' ? 'border-brand-gold shadow-lg animate-pulse' : booking.status === 'cancelled_by_user' ? 'border-red-900 bg-red-950/20' : 'border-gray-800'}`}>
                        <div className="flex flex-col md:flex-row gap-8 justify-between">
                           <div className="flex gap-6">
-                             <div className="w-16 h-16 rounded-2xl bg-brand-dark border border-brand-gold/20 flex items-center justify-center text-brand-gold"><CalendarCheck size={28} /></div>
+                             <div className={`w-16 h-16 rounded-2xl bg-brand-dark border flex items-center justify-center ${booking.status === 'cancelled_by_user' ? 'text-red-500 border-red-800' : 'text-brand-gold border-brand-gold/20'}`}><CalendarCheck size={28} /></div>
                              <div className="flex-1">
                                 <div className="flex flex-wrap items-center gap-3 mb-2">
                                    <h4 className="text-white font-bold text-2xl uppercase tracking-widest">{booking.bookingType} Party</h4>
-                                   <span className={`text-[10px] px-3 py-1 rounded-full font-bold uppercase ${booking.status === 'pending' ? 'bg-brand-gold text-brand-black' : booking.status === 'accepted' ? 'bg-green-500 text-white' : 'bg-red-500 text-white'}`}>{booking.status}</span>
+                                   <span className={`text-[10px] px-3 py-1 rounded-full font-bold uppercase ${booking.status === 'pending' ? 'bg-brand-gold text-brand-black' : booking.status === 'accepted' ? 'bg-green-500 text-white' : 'bg-red-500 text-white'}`}>
+                                     {booking.status === 'cancelled_by_user' ? 'User Cancelled 🔕' : booking.status}
+                                   </span>
                                 </div>
                                 <p className="text-sm text-gray-400 flex items-center gap-2 mb-4"><User size={14} className="text-brand-gold" /> {booking.userName} • {booking.phone}</p>
                                 <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-[10px] font-bold uppercase tracking-widest">
