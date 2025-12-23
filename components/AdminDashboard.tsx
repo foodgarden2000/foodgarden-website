@@ -51,13 +51,17 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
   const soundEnabledRef = useRef(false);
   const isInitialLoad = useRef(true);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const cancelAudioRef = useRef<HTMLAudioElement | null>(null);
 
   const [menuForm, setMenuForm] = useState<Partial<MenuItem>>({ name: '', category: '', price: '', description: '', image: '' });
 
   useEffect(() => {
-    // Initialize Notification Sound
+    // Initialize Notification Sounds
     audioRef.current = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3');
     audioRef.current.preload = 'auto';
+
+    cancelAudioRef.current = new Audio('https://assets.mixkit.co/active_storage/sfx/2568/2568-preview.mp3');
+    cancelAudioRef.current.preload = 'auto';
 
     // Sync ref with state
     soundEnabledRef.current = isSoundEnabled;
@@ -79,12 +83,22 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
     const unsubOrders = onSnapshot(collection(db, "orders"), (snapshot) => {
       if (!isInitialLoad.current && soundEnabledRef.current) {
         snapshot.docChanges().forEach((change) => {
+          const data = change.doc.data() as Order;
+
           if (change.type === "added") {
-            const data = change.doc.data() as Order;
             if (data.status === 'pending') {
               console.log("🔔 New order/booking received! Playing notification sound...");
               audioRef.current?.play().catch(err => {
                 console.error("Audio playback failed:", err);
+              });
+            }
+          }
+
+          if (change.type === "modified") {
+            if (data.status === 'cancelled_by_user' && data.cancelledBy === 'user') {
+              console.log("🛑 USER CANCELLED ORDER:", change.doc.id);
+              cancelAudioRef.current?.play().catch(err => {
+                console.error("Cancel audio playback failed:", err);
               });
             }
           }
@@ -173,11 +187,20 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
   const toggleSound = () => {
     const newState = !isSoundEnabled;
     setIsSoundEnabled(newState);
-    if (newState && audioRef.current) {
-      audioRef.current.play().then(() => {
-        audioRef.current?.pause();
-        if (audioRef.current) audioRef.current.currentTime = 0;
-      }).catch(() => {});
+    if (newState) {
+      // Play and pause both sounds to unlock audio permission in the browser
+      if (audioRef.current) {
+        audioRef.current.play().then(() => {
+          audioRef.current?.pause();
+          if (audioRef.current) audioRef.current.currentTime = 0;
+        }).catch(() => {});
+      }
+      if (cancelAudioRef.current) {
+        cancelAudioRef.current.play().then(() => {
+          cancelAudioRef.current?.pause();
+          if (cancelAudioRef.current) cancelAudioRef.current.currentTime = 0;
+        }).catch(() => {});
+      }
     }
   };
 
@@ -338,7 +361,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
             className={`flex items-center gap-2 px-6 py-2 rounded-md font-bold text-[10px] uppercase tracking-widest transition-all ml-2 border ${isSoundEnabled ? 'border-brand-gold text-brand-gold bg-brand-gold/10' : 'border-gray-800 text-gray-500 hover:text-white animate-pulse'}`}
           >
             {isSoundEnabled ? <Volume2 size={12} /> : <VolumeX size={12} />}
-            Sound: {isSoundEnabled ? 'ON' : 'OFF'}
+            {isSoundEnabled ? 'ALERTS ON' : 'ENABLE ALERTS'}
           </button>
 
           <button onClick={onClose} className="flex items-center gap-2 px-6 py-2 rounded-md font-bold text-[10px] uppercase tracking-widest text-brand-red ml-2 border-l border-brand-gold/10 hover:bg-brand-red hover:text-white transition-all">
@@ -509,12 +532,15 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
                     .map(order => {
                       const action = getStatusAction(order.status);
                       const statusLabel = (order.status || 'pending').replace(/_/g, ' ');
+                      const isUserCancelled = order.status === 'cancelled_by_user' && order.cancelledBy === 'user';
+                      const isAdminCancelled = order.status === 'cancelled_by_admin';
+                      const isCancelled = isUserCancelled || isAdminCancelled;
                       
                       return (
-                        <div key={order.id} className={`bg-brand-dark/50 backdrop-blur-xl border rounded-3xl p-8 transition-all group ${order.status === 'pending' ? 'border-brand-gold shadow-[0_0_20px_rgba(212,175,55,0.05)]' : 'border-gray-800'}`}>
+                        <div key={order.id} className={`bg-brand-dark/50 backdrop-blur-xl border rounded-3xl p-8 transition-all group ${order.status === 'pending' ? 'border-brand-gold shadow-[0_0_20px_rgba(212,175,55,0.05)]' : isUserCancelled ? 'border-red-600/50 bg-red-900/10 shadow-[0_0_15px_rgba(220,38,38,0.1)]' : isCancelled ? 'border-red-900/50 bg-red-950/10' : 'border-gray-800'}`}>
                           <div className="flex flex-col md:flex-row gap-8 justify-between">
                             <div className="flex gap-6">
-                              <div className="w-16 h-16 bg-brand-dark rounded-2xl flex items-center justify-center text-brand-gold border border-brand-gold/20 shrink-0 shadow-lg group-hover:border-brand-gold/50 transition-colors">
+                              <div className={`w-16 h-16 rounded-2xl flex items-center justify-center border shrink-0 shadow-lg group-hover:border-brand-gold/50 transition-colors ${isCancelled ? 'bg-red-950/20 text-red-500 border-red-900/50' : 'bg-brand-dark text-brand-gold border-brand-gold/20'}`}>
                                 {order.orderType === 'delivery' ? <Truck size={28} /> : order.orderType === 'table_booking' ? <Coffee size={28} /> : <Sofa size={28} />}
                               </div>
                               <div>
@@ -524,8 +550,11 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
                                   {order.status === 'rejected' && (
                                     <span className="text-[10px] bg-red-500/10 text-red-500 px-3 py-1 rounded-full uppercase font-bold tracking-widest flex items-center gap-1"><Ban size={10} /> Rejected</span>
                                   )}
-                                  {(order.status === 'cancelled_by_user' || order.status === 'cancelled_by_admin') && (
-                                    <span className="text-[10px] bg-red-800/10 text-red-600 px-3 py-1 rounded-full uppercase font-bold tracking-widest flex items-center gap-1"><Ban size={10} /> {order.status === 'cancelled_by_user' ? 'Cancelled by User' : 'Cancelled by Admin'}</span>
+                                  {isUserCancelled && (
+                                    <span className="text-[10px] bg-red-600 text-white px-3 py-1 rounded-full uppercase font-bold tracking-widest flex items-center gap-1 shadow-md animate-pulse"><Ban size={10} /> Cancelled by User</span>
+                                  )}
+                                  {isAdminCancelled && (
+                                    <span className="text-[10px] bg-red-800/10 text-red-600 px-3 py-1 rounded-full uppercase font-bold tracking-widest flex items-center gap-1"><Ban size={10} /> Cancelled by Admin</span>
                                   )}
                                   {order.status === 'delivered' && (
                                     <span className="text-[10px] bg-green-500/10 text-green-500 px-3 py-1 rounded-full uppercase font-bold tracking-widest flex items-center gap-1"><CheckCircle2 size={10} /> {order.orderType === 'delivery' ? 'Delivered' : 'Completed'}</span>
@@ -536,14 +565,14 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
                                 </p>
                                 <div className="mt-5 flex flex-wrap items-center gap-4 text-[10px] font-bold uppercase tracking-widest">
                                   <div className="bg-gray-900 text-gray-400 px-4 py-1.5 rounded-full border border-white/5 flex items-center gap-2">
-                                    <Clock size={12} /> Status: <span className={`text-white uppercase ${order.status.includes('cancelled') || order.status === 'rejected' ? 'text-red-500' : ''}`}>{statusLabel}</span>
+                                    <Clock size={12} /> Status: <span className={`text-white uppercase ${isCancelled || order.status === 'rejected' ? 'text-red-500 font-bold' : ''}`}>{statusLabel}</span>
                                   </div>
                                   <div className="bg-gray-900 text-gray-400 px-4 py-1.5 rounded-full border border-white/5 flex items-center gap-2">
                                     <CalendarDays size={12} /> {new Date(order.createdAt).toLocaleString()}
                                   </div>
                                 </div>
                                 {(order.rejectReason || order.cancelReason) && (
-                                  <p className="mt-4 p-4 bg-red-500/5 rounded-2xl border border-red-500/10 text-red-400 text-xs italic">
+                                  <p className={`mt-4 p-4 rounded-2xl border text-xs italic ${isUserCancelled ? 'bg-red-600/10 border-red-500/30 text-red-200' : isCancelled ? 'bg-red-500/10 border-red-500/20 text-red-400' : 'bg-red-500/5 border-red-500/10 text-red-400'}`}>
                                     {order.rejectReason ? `Rejection Reason: ${order.rejectReason}` : `Cancellation Reason (${order.cancelledBy}): ${order.cancelReason}`}
                                   </p>
                                 )}
@@ -576,7 +605,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
                                     <button onClick={() => setActioningOrder({id: order.id, action: 'cancel'})} className="flex-1 md:flex-none flex items-center justify-center gap-2 px-6 py-3 border border-red-800 text-red-600 rounded-xl text-[10px] font-bold uppercase tracking-widest hover:bg-red-600 hover:text-white active:scale-95 transition-all shadow-lg"><XCircle size={16} /> Cancel</button>
                                   </>
                                 )}
-                                {order.status === 'preparing' || order.status === 'out_for_delivery' && action && (
+                                {(order.status === 'preparing' || order.status === 'out_for_delivery') && action && (
                                    <button onClick={() => handleUpdateOrderStatus(order.id, action.next as OrderStatus)} className={`flex-1 md:flex-none flex items-center justify-center gap-2 px-6 py-3 ${action.color} text-white rounded-xl text-[10px] font-bold uppercase tracking-widest hover:brightness-110 active:scale-95 transition-all shadow-lg`}><action.icon size={16} /> {action.label}</button>
                                 )}
                                 <button onClick={() => deleteItem('orders', order.id)} className="px-4 py-3 text-gray-700 hover:text-red-500 bg-gray-900 rounded-xl border border-white/5 transition-colors"><Trash2 size={16}/></button>
