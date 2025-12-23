@@ -121,10 +121,11 @@ const Menu: React.FC<MenuProps> = ({ whatsappNumber, user, currentPoints, onNavi
 
     const potentialPoints = calculatePotentialPoints(selectedOrderItem.priceNum || selectedOrderItem.price || 0, orderFormData.quantity);
     const userType: UserCategory = userProfile?.role === 'subscriber' ? 'subscriber' : 'registered';
-    const requiredPoints = totalAmount * 2;
+    const totalAmountValue = getCleanPrice(selectedOrderItem) * orderFormData.quantity;
+    const requiredRedeemPoints = totalAmountValue * 2;
 
-    if (selectedPaymentMode === 'points' && (userProfile?.points || 0) < requiredPoints) {
-      alert(`Insufficient points! You need ${requiredPoints} points but have ${userProfile?.points || 0}.`);
+    if (selectedPaymentMode === 'points' && (userProfile?.points || 0) < requiredRedeemPoints) {
+      alert(`Insufficient points! You need ${requiredRedeemPoints} points but have ${userProfile?.points || 0}.`);
       return;
     }
 
@@ -140,7 +141,7 @@ const Menu: React.FC<MenuProps> = ({ whatsappNumber, user, currentPoints, onNavi
       quantity: orderFormData.quantity,
       status: 'pending',
       paymentMode: selectedPaymentMode,
-      pointsUsed: selectedPaymentMode === 'points' ? requiredPoints : 0,
+      pointsUsed: selectedPaymentMode === 'points' ? requiredRedeemPoints : 0,
       amountEquivalent: selectedPaymentMode === 'points' ? totalAmount : 0,
       pointsDeducted: false,
       pointsEarned: selectedPaymentMode === 'points' ? 0 : potentialPoints,
@@ -177,6 +178,12 @@ const Menu: React.FC<MenuProps> = ({ whatsappNumber, user, currentPoints, onNavi
     if (!item) return 0;
     if (item.priceNum) return item.priceNum;
     return parseInt(item.price?.replace(/\D/g, '') || "0");
+  };
+
+  const handleImageError = (e: React.SyntheticEvent<HTMLImageElement, Event>) => {
+    const target = e.currentTarget;
+    target.onerror = null;
+    target.src = 'https://via.placeholder.com/300x200?text=No+Image';
   };
 
   const totalAmountRedeem = getCleanPrice(selectedOrderItem) * orderFormData.quantity;
@@ -239,7 +246,6 @@ const Menu: React.FC<MenuProps> = ({ whatsappNumber, user, currentPoints, onNavi
           <div className="flex justify-center py-20"><Loader2 className="animate-spin text-brand-gold" size={48} /></div>
         ) : !activeCategory && !searchQuery ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-            {/* Render categories based on Visual Category Management (menuCategories collection) */}
             {activeMenuCategories.map(cat => (
               <div 
                 key={cat.id} 
@@ -250,9 +256,7 @@ const Menu: React.FC<MenuProps> = ({ whatsappNumber, user, currentPoints, onNavi
                   src={getOptimizedImageURL(cat.categoryImageUrl)} 
                   className="absolute inset-0 w-full h-full object-cover transform group-hover:scale-110 transition-transform duration-1000" 
                   alt={cat.categoryName} 
-                  onError={(e) => {
-                    (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c';
-                  }}
+                  onError={handleImageError}
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-brand-black via-brand-black/40 to-transparent z-10"></div>
                 <div className="absolute inset-0 flex flex-col items-center justify-center z-20 text-center p-6">
@@ -264,7 +268,6 @@ const Menu: React.FC<MenuProps> = ({ whatsappNumber, user, currentPoints, onNavi
                 </div>
               </div>
             ))}
-            {/* Fallback for items that might be in categories not yet visuals-managed */}
             {uniqueCategoriesFromItems.filter(ci => !activeMenuCategories.some(ac => ac.categoryName === ci)).map(cat => (
               <div 
                 key={cat} 
@@ -296,12 +299,11 @@ const Menu: React.FC<MenuProps> = ({ whatsappNumber, user, currentPoints, onNavi
                 <div key={idx} className="bg-white border border-gray-100 rounded-xl overflow-hidden shadow-sm hover:shadow-2xl transition-all duration-300 flex flex-col animate-fade-in-up" style={{ animationDelay: `${idx * 0.05}s` }}>
                   <div className="h-64 bg-gray-100 relative overflow-hidden">
                     {item.backgroundImageUrl || item.image ? (
-                      <img src={getOptimizedImageURL(item.backgroundImageUrl || item.image || '')} className="w-full h-full object-cover hover:scale-110 transition-transform duration-700" alt={item.itemName || item.name} />
+                      <img src={getOptimizedImageURL(item.backgroundImageUrl || item.image || '')} className="w-full h-full object-cover hover:scale-110 transition-transform duration-700" alt={item.itemName || item.name} onError={handleImageError} />
                     ) : (
                       <div className="flex items-center justify-center h-full"><Utensils className="text-gray-300" size={48} /></div>
                     )}
                     
-                    {/* Status Badges */}
                     <div className="absolute top-4 left-4 flex flex-col gap-2">
                       <span className="bg-brand-black/60 backdrop-blur-md text-white text-[8px] font-bold uppercase tracking-widest px-3 py-1 rounded-full border border-white/10">{item.category}</span>
                       {item.isNewItem && (

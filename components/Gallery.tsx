@@ -91,6 +91,12 @@ const Gallery: React.FC = () => {
     }
   };
 
+  const handleImageError = (e: React.SyntheticEvent<HTMLImageElement, Event>) => {
+    const target = e.currentTarget;
+    target.onerror = null;
+    target.src = 'https://via.placeholder.com/600x400?text=Gallery+Image';
+  };
+
   const visibleImages = images.slice(0, visibleCount);
 
   return (
@@ -119,13 +125,10 @@ const Gallery: React.FC = () => {
                     src={item.image} 
                     alt={item.caption || `Chef's Jalsa Gallery ${idx + 1}`} 
                     loading="lazy"
-                    onError={(e) => {
-                      (e.target as HTMLImageElement).src = `https://picsum.photos/600/600?random=${idx + 50}`;
-                    }}
+                    onError={handleImageError}
                     className="w-full h-full object-cover transform transition-transform duration-700 group-hover:scale-105"
                   />
                   
-                  {/* Hover Overlay */}
                   <div className="absolute inset-0 bg-brand-black/60 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex flex-col items-center justify-center p-4 text-center">
                     <div className="border border-white/30 p-3 rounded-full mb-3 transform translate-y-4 group-hover:translate-y-0 transition-all duration-300">
                       <ZoomIn className="text-white w-6 h-6" />
@@ -140,9 +143,7 @@ const Gallery: React.FC = () => {
               ))}
             </div>
             
-            {/* Pagination Buttons */}
             <div className="mt-16 text-center flex justify-center gap-6">
-               {/* See More Button */}
               {images.length > visibleCount && (
                 <button 
                   onClick={() => setVisibleCount(prev => prev + 6)}
@@ -152,7 +153,6 @@ const Gallery: React.FC = () => {
                 </button>
               )}
               
-              {/* See Less Button */}
               {visibleCount > 6 && (
                 <button 
                   onClick={handleSeeLess}
@@ -166,7 +166,6 @@ const Gallery: React.FC = () => {
         )}
       </div>
 
-      {/* Lightbox Modal */}
       {selectedImage && (
         <div 
           className="fixed inset-0 z-[100] bg-black/95 backdrop-blur-xl flex items-center justify-center p-4 animate-fade-in"

@@ -97,11 +97,12 @@ const App: React.FC = () => {
         const now = new Date();
 
         if (expiryDate <= now) {
-          console.log("Yearly subscription expiry checked");
+          console.log("Yearly subscription expiry checked - Processing Expiry");
           try {
-            // 1. Update user document
+            // 1. Update user document - CRITICAL: Set isActive to false to match Admin query
             await updateDoc(doc(db, "users", user.uid), {
               role: 'registered',
+              isActive: false, 
               'subscription.status': 'expired',
               'subscription.isExpired': true,
               'subscription.plan': null
@@ -122,6 +123,7 @@ const App: React.FC = () => {
               const subId = subSnap.docs[0].id;
               await updateDoc(doc(db, "subscription", subId), {
                 status: 'expired',
+                isActive: false, 
                 isExpired: true,
                 updatedAt: new Date().toISOString()
               });

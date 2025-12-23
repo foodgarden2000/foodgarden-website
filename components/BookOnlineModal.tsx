@@ -4,7 +4,7 @@ import { X, Coffee, Sofa, ShoppingBag, PartyPopper, Cake, Users, Phone, Loader2,
 import { db } from '../firebase';
 import { collection, addDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 import { User } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
-import { EventBooking } from '../types';
+import { Order, OrderType, UserCategory } from '../types';
 
 interface BookOnlineModalProps {
   isOpen: boolean;
@@ -64,22 +64,36 @@ const BookOnlineModal: React.FC<BookOnlineModalProps> = ({ isOpen, onClose, user
 
     setLoading(true);
     try {
-      const bookingData: EventBooking = {
-        bookingType: selectedEventType,
+      // Map event types to OrderType
+      let mappedType: OrderType = 'kitty_party';
+      if (selectedEventType === 'birthday') mappedType = 'birthday_party';
+      if (selectedEventType === 'club') mappedType = 'club_meeting';
+
+      // Unified Order structure for event bookings
+      const bookingData: Order = {
         userId: user.uid,
+        userType: 'registered', // Default user type
         userName: formData.name,
-        phone: formData.phone,
-        date: formData.date,
-        time: formData.time,
-        peopleCount: formData.people,
-        specialNote: formData.note,
+        userPhone: formData.phone,
+        address: `Guests: ${formData.people} | ${formData.date} at ${formData.time}`,
+        itemName: `${selectedEventType.toUpperCase()} Event Booking`,
+        orderType: mappedType,
+        orderAmount: 0, // Events are quoted later
+        quantity: formData.people,
         status: 'pending',
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
+        paymentMode: 'cash',
+        pointsUsed: 0,
+        amountEquivalent: 0,
+        pointsDeducted: false,
+        pointsEarned: 0,
+        pointsCredited: false,
+        notes: formData.note,
+        createdAt: new Date().toISOString()
       };
 
-      const docRef = await addDoc(collection(db, "eventBookings"), bookingData);
-      console.log("New booking created:", selectedEventType, docRef.id);
+      // Saving to 'orders' collection instead of 'eventBookings' for unified Admin Panel
+      const docRef = await addDoc(collection(db, "orders"), bookingData);
+      console.log("New unified order created:", mappedType, docRef.id);
 
       const msg = `*NEW ${selectedEventType.toUpperCase()} BOOKING - Chef's Jalsa*\n` +
                   `*ID:* ${docRef.id}\n` +

@@ -1,4 +1,5 @@
 
+
 export interface MenuItem {
   // Legacy Fields (kept for backward compatibility)
   name: string;
@@ -35,7 +36,8 @@ export interface CategoryConfig {
   image: string;
 }
 
-export type OrderStatus = 'pending' | 'accepted' | 'preparing' | 'out_for_delivery' | 'delivered' | 'rejected' | 'cancelled_by_user' | 'cancelled_by_admin';
+// Added 'ready' to OrderStatus type
+export type OrderStatus = 'pending' | 'accepted' | 'preparing' | 'ready' | 'out_for_delivery' | 'delivered' | 'rejected' | 'cancelled_by_user' | 'cancelled_by_admin';
 export type OrderType = 'delivery' | 'table_booking' | 'cabin_booking' | 'kitty_party' | 'birthday_party' | 'club_meeting';
 export type PaymentMode = 'upi' | 'cash' | 'points';
 export type UserCategory = 'normal' | 'registered' | 'subscriber';
