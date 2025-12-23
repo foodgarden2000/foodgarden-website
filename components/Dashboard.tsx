@@ -4,7 +4,7 @@ import { User as FirebaseUser, signOut } from "https://www.gstatic.com/firebasej
 import { auth, db } from '../firebase';
 import Auth from './Auth';
 import { 
-  ArrowLeft, Award, LogOut, User, ShoppingBag, Clock, Share2, Copy, Check, Gift, Truck, Coffee, Sofa, AlertCircle, Loader2, Smartphone, ShieldCheck, Zap, CreditCard, ExternalLink, ArrowRight, Ban, XCircle, Search, Tag, Coins, CalendarCheck, MapPin
+  ArrowLeft, Award, LogOut, User, ShoppingBag, Clock, Share2, Copy, Check, Gift, Truck, Coffee, Sofa, AlertCircle, Loader2, Smartphone, ShieldCheck, Zap, CreditCard, ExternalLink, ArrowRight, Ban, XCircle, Search, Tag, Coins, CalendarCheck, MapPin, Calendar
 } from 'lucide-react';
 import { 
   doc, 
@@ -147,6 +147,11 @@ const Dashboard: React.FC<DashboardProps> = ({ user, points, onBack, adminMode, 
     return <Auth adminOnly={adminOnlyRequest} externalReferralCode={referralCodeFromUrl} />;
   }
 
+  const isExpired = profile?.subscription?.status === 'expired' || 
+                   (profile?.subscription?.plan === 'yearly' && 
+                    profile?.subscription?.expiryDate && 
+                    new Date(profile.subscription.expiryDate) <= new Date());
+
   return (
     <div className="pt-32 pb-24 min-h-screen bg-brand-cream relative overflow-hidden font-sans">
       <div className="container mx-auto px-4 md:px-8 relative z-10">
@@ -161,9 +166,14 @@ const Dashboard: React.FC<DashboardProps> = ({ user, points, onBack, adminMode, 
                 <h2 className="text-2xl font-display font-bold text-brand-black">
                   {profile?.name || 'Member'}
                 </h2>
-                {profile?.role === 'subscriber' && (
+                {profile?.role === 'subscriber' && !isExpired && (
                   <span className="bg-brand-red text-white px-3 py-1 rounded text-[8px] font-bold uppercase flex items-center gap-1 shadow-lg">
                     <ShieldCheck size={10} fill="currentColor" /> Premium Subscriber
+                  </span>
+                )}
+                {isExpired && (
+                  <span className="bg-gray-400 text-white px-3 py-1 rounded text-[8px] font-bold uppercase flex items-center gap-1 shadow-lg">
+                    <AlertCircle size={10} /> Plan Expired
                   </span>
                 )}
               </div>
@@ -176,7 +186,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, points, onBack, adminMode, 
             <button onClick={() => setActiveTab('orders')} className={`px-6 py-2 rounded-lg text-xs font-bold uppercase tracking-widest whitespace-nowrap ${activeTab === 'orders' ? 'bg-brand-dark text-white' : 'text-gray-400'}`}>Orders</button>
             <button onClick={() => setActiveTab('bookings')} className={`px-6 py-2 rounded-lg text-xs font-bold uppercase tracking-widest whitespace-nowrap ${activeTab === 'bookings' ? 'bg-brand-dark text-white' : 'text-gray-400'}`}>Bookings</button>
             <button onClick={() => setActiveTab('subscription')} className={`px-6 py-2 rounded-lg text-xs font-bold uppercase tracking-widest flex items-center gap-2 whitespace-nowrap ${activeTab === 'subscription' ? 'bg-brand-red text-white' : 'text-brand-red'}`}>
-              <Zap size={12} /> {profile?.role === 'subscriber' ? 'My Status' : 'Subscribe'}
+              <Zap size={12} /> {profile?.role === 'subscriber' && !isExpired ? 'My Status' : 'Subscribe'}
             </button>
             <button onClick={() => signOut(auth)} className="px-6 py-2 rounded-lg text-xs font-bold uppercase tracking-widest text-brand-red">Logout</button>
           </div>
@@ -208,16 +218,34 @@ const Dashboard: React.FC<DashboardProps> = ({ user, points, onBack, adminMode, 
 
         {activeTab === 'subscription' && (
           <div className="max-w-4xl mx-auto">
-            {profile?.role === 'subscriber' ? (
+            {profile?.role === 'subscriber' && !isExpired ? (
                <div className="bg-brand-dark p-12 rounded-3xl border border-brand-gold/30 text-center animate-fade-in">
                   <ShieldCheck size={48} className="text-brand-gold mx-auto mb-6" />
                   <h2 className="text-3xl font-display font-bold text-white mb-4 uppercase tracking-widest">Premium Membership Active</h2>
                   <p className="text-gray-400 mb-8 font-light italic">Enjoy 15% loyalty points and priority service!</p>
-                  <div className="grid grid-cols-2 gap-4 max-w-sm mx-auto text-left bg-black/40 p-6 rounded-2xl border border-white/5">
-                    <span className="text-[10px] text-gray-500 font-bold uppercase tracking-widest">Plan:</span>
-                    <span className="text-brand-gold text-xs font-bold uppercase">{profile.subscription?.plan}</span>
-                    <span className="text-[10px] text-gray-500 font-bold uppercase tracking-widest">Since:</span>
-                    <span className="text-gray-300 text-xs">{new Date(profile.subscription?.startDate || '').toLocaleDateString()}</span>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-lg mx-auto text-left bg-black/40 p-8 rounded-2xl border border-white/5 shadow-2xl">
+                    <div className="flex items-center gap-3">
+                      <Zap className="text-brand-gold" size={20} />
+                      <div>
+                        <p className="text-[10px] text-gray-500 font-bold uppercase tracking-widest">Current Plan</p>
+                        <p className="text-brand-gold text-sm font-bold uppercase">{profile.subscription?.plan}</p>
+                      </div>
+                    </div>
+                    {profile.subscription?.plan === 'yearly' && (
+                      <div className="flex items-center gap-3">
+                        <Calendar className="text-brand-gold" size={20} />
+                        <div>
+                          <p className="text-[10px] text-gray-500 font-bold uppercase tracking-widest">Expiry Date</p>
+                          <p className="text-gray-300 text-sm font-bold">
+                            {profile.subscription?.expiryDate ? new Date(profile.subscription.expiryDate).toLocaleDateString() : 'N/A'}
+                          </p>
+                        </div>
+                      </div>
+                    )}
+                    <div className="flex items-center gap-3 md:col-span-2 mt-4 pt-4 border-t border-white/10">
+                      <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
+                      <p className="text-[10px] text-green-500 font-bold uppercase tracking-widest">Account Status: Active</p>
+                    </div>
                   </div>
                </div>
             ) : subStep === 'IDLE' && (
@@ -225,13 +253,15 @@ const Dashboard: React.FC<DashboardProps> = ({ user, points, onBack, adminMode, 
                 <h2 className="text-4xl font-display font-bold text-brand-black mb-4 uppercase tracking-widest">Become a Subscriber</h2>
                 <p className="text-gray-500 mb-12 font-light">Join our elite circle for exclusive rewards and faster service.</p>
                 
-                {activeSubRequest && activeSubRequest.status === 'rejected' && (
-                  <div className="mb-12 p-6 bg-red-50 border border-red-200 rounded-3xl text-left flex items-start gap-4">
-                    <AlertCircle className="text-red-500 shrink-0 mt-1" />
+                {(activeSubRequest?.status === 'rejected' || activeSubRequest?.status === 'expired' || isExpired) && (
+                  <div className={`mb-12 p-6 rounded-3xl text-left flex items-start gap-4 border ${activeSubRequest?.status === 'rejected' ? 'bg-red-50 border-red-200' : 'bg-orange-50 border-orange-200'}`}>
+                    <AlertCircle className={`${activeSubRequest?.status === 'rejected' ? 'text-red-500' : 'text-orange-500'} shrink-0 mt-1`} />
                     <div>
-                      <h4 className="text-red-800 font-bold text-sm uppercase tracking-widest mb-1">Previous Request Rejected</h4>
-                      <p className="text-red-600 text-xs italic">Reason: "{activeSubRequest.adminReason}"</p>
-                      <p className="text-red-500 text-[10px] font-bold mt-2 uppercase tracking-widest">You can submit a new request below.</p>
+                      <h4 className={`font-bold text-sm uppercase tracking-widest mb-1 ${activeSubRequest?.status === 'rejected' ? 'text-red-800' : 'text-orange-800'}`}>
+                        {activeSubRequest?.status === 'rejected' ? 'Previous Request Rejected' : 'Subscription Expired'}
+                      </h4>
+                      {activeSubRequest?.adminReason && <p className="text-red-600 text-xs italic">Reason: "{activeSubRequest.adminReason}"</p>}
+                      <p className={`text-[10px] font-bold mt-2 uppercase tracking-widest ${activeSubRequest?.status === 'rejected' ? 'text-red-500' : 'text-orange-500'}`}>You can renew or submit a new request below.</p>
                     </div>
                   </div>
                 )}
@@ -241,12 +271,14 @@ const Dashboard: React.FC<DashboardProps> = ({ user, points, onBack, adminMode, 
                       <Zap size={32} className="text-brand-gold mb-4 mx-auto" />
                       <h3 className="text-2xl font-display font-bold mb-8 uppercase tracking-widest">Yearly Plan</h3>
                       <p className="text-4xl font-bold mb-8 text-brand-dark">₹499</p>
+                      <p className="text-[10px] text-gray-400 font-bold uppercase mb-8 tracking-widest">Valid for 365 Days</p>
                       <button onClick={() => handleSubscribe({name: 'yearly', price: 499})} className="w-full py-4 bg-brand-dark text-white rounded-xl font-bold uppercase text-xs tracking-widest hover:bg-brand-gold transition-colors shadow-lg">Select Plan</button>
                    </div>
                    <div className="bg-white p-10 rounded-3xl border-2 border-brand-red shadow-xl hover:scale-105 transition-transform">
                       <Award size={32} className="text-brand-red mb-4 mx-auto" />
                       <h3 className="text-2xl font-display font-bold mb-8 uppercase tracking-widest">Lifetime Plan</h3>
                       <p className="text-4xl font-bold mb-8 text-brand-red">₹1499</p>
+                      <p className="text-[10px] text-gray-400 font-bold uppercase mb-8 tracking-widest">Never Expires</p>
                       <button onClick={() => handleSubscribe({name: 'lifetime', price: 1499})} className="w-full py-4 bg-brand-red text-white rounded-xl font-bold uppercase text-xs tracking-widest hover:bg-brand-black transition-colors shadow-lg">Select Plan</button>
                    </div>
                 </div>
@@ -298,7 +330,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, points, onBack, adminMode, 
           </div>
         )}
 
-        {/* Orders and Bookings tabs remain untouched as requested */}
+        {/* Orders and Bookings tabs remain untouched */}
         {activeTab === 'orders' && (
           <div className="space-y-8 animate-fade-in">
             {myOrders.length === 0 ? (

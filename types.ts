@@ -75,9 +75,11 @@ export interface UserProfile {
   referredBy: string | null;
   createdAt: string;
   subscription?: {
-    status: 'active' | 'rejected' | 'pending';
+    status: 'active' | 'rejected' | 'pending' | 'expired';
     plan: 'yearly' | 'lifetime';
     startDate: string;
+    expiryDate?: string;
+    isExpired?: boolean;
     transactionId?: string;
   };
 }
@@ -91,8 +93,10 @@ export interface SubscriptionRequest {
   transactionId: string;
   planType: 'yearly' | 'lifetime';
   amountPaid: number;
-  status: 'pending' | 'approved' | 'rejected';
+  status: 'pending' | 'approved' | 'rejected' | 'expired';
   adminReason?: string;
+  expiryDate?: string | null;
+  isExpired?: boolean;
   createdAt: string;
   updatedAt: string;
 }

@@ -138,18 +138,33 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
     if (!window.confirm(`APPROVE Premium Status for ${sub.userName}?`)) return;
     setIsProcessingSub(sub.id);
     try {
-      const now = new Date().toISOString();
+      const now = new Date();
+      const nowISO = now.toISOString();
+      
+      let expiryDate: string | null = null;
+      if (sub.planType === 'yearly') {
+        const expiry = new Date(now);
+        expiry.setDate(expiry.getDate() + 365);
+        expiryDate = expiry.toISOString();
+      }
+
       await updateDoc(doc(db, "subscription", sub.id), {
         status: 'approved',
-        updatedAt: now
+        updatedAt: nowISO,
+        expiryDate: expiryDate,
+        isExpired: false
       });
+
       await updateDoc(doc(db, "users", sub.userId), {
         role: 'subscriber',
         'subscription.status': 'active',
         'subscription.plan': sub.planType,
-        'subscription.startDate': now,
+        'subscription.startDate': nowISO,
+        'subscription.expiryDate': expiryDate,
+        'subscription.isExpired': false,
         'subscription.transactionId': sub.transactionId
       });
+
       console.log("Subscription approved:", sub.userId);
       alert("Subscription approved successfully.");
     } catch (err) {
@@ -359,7 +374,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
               </div>
 
               <div className="grid grid-cols-1 gap-6 pt-8 border-t border-brand-gold/10">
-                {/* Simplified Order/Booking List Logic */}
                 {activeOrderCategory === 'event_booking' ? (
                   analyticsData.filteredBookings.map(booking => (
                     <div key={booking.id} className="bg-brand-dark/50 border border-gray-800 rounded-3xl p-8 transition-all hover:border-brand-gold/30">
@@ -489,45 +503,58 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
                       <thead>
                         <tr className="bg-black/50 text-[10px] text-gray-500 uppercase font-bold tracking-[0.2em] border-b border-white/5">
                           <th className="px-8 py-5">Subscriber</th>
-                          <th className="px-8 py-5">Contact</th>
+                          <th className="px-8 py-5">Status</th>
                           <th className="px-8 py-5">Plan</th>
                           <th className="px-8 py-5">Join Date</th>
+                          <th className="px-8 py-5">Expiry Date</th>
                           <th className="px-8 py-5 text-right">Action</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-white/5">
-                        {/* Fix: Explicitly type parameter 'u' as UserProfile for filter callback to resolve TS errors */}
-                        {Object.values(allUsers).filter((u: UserProfile) => u.role === 'subscriber').length === 0 ? (
+                        {Object.values(allUsers).filter((u: UserProfile) => u.role === 'subscriber' || u.subscription?.status === 'expired').length === 0 ? (
                           <tr>
-                            <td colSpan={5} className="px-8 py-20 text-center text-gray-500 italic font-serif">No active subscribers found.</td>
+                            <td colSpan={6} className="px-8 py-20 text-center text-gray-500 italic font-serif">No subscribers found.</td>
                           </tr>
                         ) : (
-                          /* Fix: Explicitly type parameter 'u' as UserProfile for filter callback to resolve TS errors */
-                          Object.values(allUsers).filter((u: UserProfile) => u.role === 'subscriber').map((subscriber: any) => (
-                            <tr key={subscriber.uid} className="hover:bg-white/[0.02] transition-colors group">
-                              <td className="px-8 py-6">
-                                <div className="flex items-center gap-3">
-                                   <div className="w-8 h-8 rounded-full bg-brand-gold/10 border border-brand-gold/30 flex items-center justify-center text-brand-gold"><User size={14} /></div>
-                                   <span className="text-white font-bold">{subscriber.name}</span>
-                                </div>
-                              </td>
-                              <td className="px-8 py-6">
-                                <div className="flex flex-col text-xs">
-                                   <span className="text-gray-400">{subscriber.email}</span>
-                                   <span className="text-gray-500">{subscriber.phone}</span>
-                                </div>
-                              </td>
-                              <td className="px-8 py-6">
-                                <span className={`text-[10px] font-bold px-3 py-1 rounded-full uppercase tracking-widest ${subscriber.subscription?.plan === 'lifetime' ? 'bg-brand-red text-white' : 'bg-brand-gold text-brand-black'}`}>{subscriber.subscription?.plan}</span>
-                              </td>
-                              <td className="px-8 py-6">
-                                <span className="text-gray-400 text-xs">{new Date(subscriber.subscription?.startDate || subscriber.createdAt).toLocaleDateString()}</span>
-                              </td>
-                              <td className="px-8 py-6 text-right">
-                                <button onClick={() => deleteItem('users', subscriber.uid)} className="p-2 text-gray-700 hover:text-red-500 transition-colors"><Trash2 size={16} /></button>
-                              </td>
-                            </tr>
-                          ))
+                          Object.values(allUsers).filter((u: UserProfile) => u.role === 'subscriber' || u.subscription?.status === 'expired').map((subscriber: any) => {
+                            const isExpired = subscriber.subscription?.status === 'expired' || 
+                                            (subscriber.subscription?.plan === 'yearly' && 
+                                             subscriber.subscription?.expiryDate && 
+                                             new Date(subscriber.subscription.expiryDate) <= new Date());
+                            
+                            return (
+                              <tr key={subscriber.uid} className={`hover:bg-white/[0.02] transition-colors group ${isExpired ? 'opacity-60' : ''}`}>
+                                <td className="px-8 py-6">
+                                  <div className="flex items-center gap-3">
+                                     <div className={`w-8 h-8 rounded-full border flex items-center justify-center ${isExpired ? 'bg-gray-800 border-gray-700 text-gray-500' : 'bg-brand-gold/10 border-brand-gold/30 text-brand-gold'}`}><User size={14} /></div>
+                                     <div className="flex flex-col">
+                                       <span className="text-white font-bold">{subscriber.name}</span>
+                                       <span className="text-gray-500 text-[10px]">{subscriber.email}</span>
+                                     </div>
+                                  </div>
+                                </td>
+                                <td className="px-8 py-6">
+                                  <span className={`text-[9px] font-bold px-2 py-1 rounded-full uppercase tracking-tighter ${isExpired ? 'bg-red-500/20 text-red-500 border border-red-500/30' : 'bg-green-500/20 text-green-500 border border-green-500/30'}`}>
+                                    {isExpired ? 'Expired' : 'Active'}
+                                  </span>
+                                </td>
+                                <td className="px-8 py-6">
+                                  <span className={`text-[10px] font-bold px-3 py-1 rounded-full uppercase tracking-widest ${subscriber.subscription?.plan === 'lifetime' ? 'bg-brand-red text-white' : 'bg-brand-gold text-brand-black'}`}>{subscriber.subscription?.plan}</span>
+                                </td>
+                                <td className="px-8 py-6">
+                                  <span className="text-gray-400 text-xs">{new Date(subscriber.subscription?.startDate || subscriber.createdAt).toLocaleDateString()}</span>
+                                </td>
+                                <td className="px-8 py-6">
+                                  <span className={`text-xs font-bold ${subscriber.subscription?.plan === 'lifetime' ? 'text-blue-400 uppercase' : isExpired ? 'text-red-400' : 'text-gray-300'}`}>
+                                    {subscriber.subscription?.plan === 'lifetime' ? 'Lifetime' : (subscriber.subscription?.expiryDate ? new Date(subscriber.subscription.expiryDate).toLocaleDateString() : 'N/A')}
+                                  </span>
+                                </td>
+                                <td className="px-8 py-6 text-right">
+                                  <button onClick={() => deleteItem('users', subscriber.uid)} className="p-2 text-gray-700 hover:text-red-500 transition-colors"><Trash2 size={16} /></button>
+                                </td>
+                              </tr>
+                            );
+                          })
                         )}
                       </tbody>
                     </table>
