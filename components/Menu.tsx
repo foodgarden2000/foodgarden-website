@@ -4,7 +4,7 @@ import { db } from '../firebase';
 import { collection, onSnapshot, query, orderBy, addDoc, doc, getDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 import { User } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
 import { Utensils, Loader2, ArrowLeft, X, Minus, Plus, Award, ChevronRight, Truck, Coffee, Sofa, Coins, CreditCard, Search as SearchIcon, Star, Zap } from 'lucide-react';
-import { MenuItem, CategoryConfig, Order, OrderType, UserProfile, UserCategory, PaymentMode } from '../types';
+import { MenuItem, MenuCategory, CategoryConfig, Order, OrderType, UserProfile, UserCategory, PaymentMode } from '../types';
 import { getOptimizedImageURL } from '../constants';
 
 interface MenuProps {
@@ -16,11 +16,11 @@ interface MenuProps {
 
 const Menu: React.FC<MenuProps> = ({ whatsappNumber, user, currentPoints, onNavigate }) => {
   const [items, setItems] = useState<MenuItem[]>([]);
-  const [categoryConfigs, setCategoryConfigs] = useState<Record<string, string>>({});
+  const [menuCategories, setMenuCategories] = useState<MenuCategory[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
   const [activeTypeFilter, setActiveTypeFilter] = useState<string>('All');
-  const [uniqueCategories, setUniqueCategories] = useState<string[]>([]);
+  const [uniqueCategoriesFromItems, setUniqueCategoriesFromItems] = useState<string[]>([]);
   const [isOrderModalOpen, setIsOrderModalOpen] = useState(false);
   const [selectedOrderItem, setSelectedOrderItem] = useState<MenuItem | null>(null);
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
@@ -37,13 +37,9 @@ const Menu: React.FC<MenuProps> = ({ whatsappNumber, user, currentPoints, onNavi
   });
 
   useEffect(() => {
-    const unsubCats = onSnapshot(collection(db, "categories"), (snapshot) => {
-      const configs: Record<string, string> = {};
-      snapshot.docs.forEach(doc => {
-        const data = doc.data() as CategoryConfig;
-        configs[data.name] = data.image;
-      });
-      setCategoryConfigs(configs);
+    // Fetch Visual Category Management Data
+    const unsubCats = onSnapshot(query(collection(db, "menuCategories"), orderBy("categoryName")), (snapshot) => {
+      setMenuCategories(snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as MenuCategory)));
     });
 
     const qMenu = query(collection(db, "menu"), orderBy("name"));
@@ -51,7 +47,7 @@ const Menu: React.FC<MenuProps> = ({ whatsappNumber, user, currentPoints, onNavi
       const fetchedItems = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as MenuItem));
       setItems(fetchedItems);
       const cats = Array.from(new Set(fetchedItems.map(i => i.category))).sort() as string[];
-      setUniqueCategories(cats);
+      setUniqueCategoriesFromItems(cats);
       setLoading(false);
     });
 
@@ -65,9 +61,16 @@ const Menu: React.FC<MenuProps> = ({ whatsappNumber, user, currentPoints, onNavi
     return () => { unsubCats(); unsubMenu(); unsubProfile(); };
   }, [user]);
 
+  // Derived visible categories (only active ones)
+  const activeMenuCategories = menuCategories.filter(c => c.isActive);
+
   const filteredItems = items.filter(item => {
     // Only show available items
     if (item.isAvailable === false) return false;
+
+    // Strict Mode: Only show items belonging to ACTIVE categories
+    const categoryConfig = menuCategories.find(c => c.categoryName === item.category);
+    if (categoryConfig && !categoryConfig.isActive) return false;
 
     const matchesSearch = (item.itemName || item.name).toLowerCase().includes(searchQuery.toLowerCase()) || 
                           item.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -236,24 +239,46 @@ const Menu: React.FC<MenuProps> = ({ whatsappNumber, user, currentPoints, onNavi
           <div className="flex justify-center py-20"><Loader2 className="animate-spin text-brand-gold" size={48} /></div>
         ) : !activeCategory && !searchQuery ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-            {uniqueCategories.map(cat => (
+            {/* Render categories based on Visual Category Management (menuCategories collection) */}
+            {activeMenuCategories.map(cat => (
+              <div 
+                key={cat.id} 
+                onClick={() => setActiveCategory(cat.categoryName)}
+                className="group relative h-72 rounded-xl overflow-hidden cursor-pointer shadow-xl bg-brand-black transition-all duration-500 hover:-translate-y-2"
+              >
+                <img 
+                  src={getOptimizedImageURL(cat.categoryImageUrl)} 
+                  className="absolute inset-0 w-full h-full object-cover transform group-hover:scale-110 transition-transform duration-1000" 
+                  alt={cat.categoryName} 
+                  onError={(e) => {
+                    (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c';
+                  }}
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-brand-black via-brand-black/40 to-transparent z-10"></div>
+                <div className="absolute inset-0 flex flex-col items-center justify-center z-20 text-center p-6">
+                  <h3 className="text-4xl font-display font-bold text-white mb-4 tracking-wider">{cat.categoryName}</h3>
+                  <div className="flex items-center gap-2 text-brand-gold opacity-0 group-hover:opacity-100 transition-all transform translate-y-4 group-hover:translate-y-0">
+                    <span className="text-xs font-bold uppercase tracking-[0.2em]">View Selection</span>
+                    <ChevronRight size={16} />
+                  </div>
+                </div>
+              </div>
+            ))}
+            {/* Fallback for items that might be in categories not yet visuals-managed */}
+            {uniqueCategoriesFromItems.filter(ci => !activeMenuCategories.some(ac => ac.categoryName === ci)).map(cat => (
               <div 
                 key={cat} 
                 onClick={() => setActiveCategory(cat)}
                 className="group relative h-72 rounded-xl overflow-hidden cursor-pointer shadow-xl bg-brand-black transition-all duration-500 hover:-translate-y-2"
               >
-                {categoryConfigs[cat] ? (
-                  <img src={getOptimizedImageURL(categoryConfigs[cat])} className="absolute inset-0 w-full h-full object-cover transform group-hover:scale-110 transition-transform duration-1000" alt={cat} />
-                ) : (
-                  <div className="absolute inset-0 bg-brand-dark flex items-center justify-center opacity-40">
-                    <Utensils className="text-brand-gold/20 w-32 h-32" />
-                  </div>
-                )}
+                <div className="absolute inset-0 bg-brand-dark flex items-center justify-center opacity-40">
+                  <Utensils className="text-brand-gold/20 w-32 h-32" />
+                </div>
                 <div className="absolute inset-0 bg-gradient-to-t from-brand-black via-brand-black/40 to-transparent z-10"></div>
                 <div className="absolute inset-0 flex flex-col items-center justify-center z-20 text-center p-6">
                   <h3 className="text-4xl font-display font-bold text-white mb-4 tracking-wider">{cat}</h3>
-                  <div className="flex items-center gap-2 text-brand-gold opacity-0 group-hover:opacity-100 transition-all transform translate-y-4 group-hover:translate-y-0">
-                    <span className="text-xs font-bold uppercase tracking-[0.2em]">View Selection</span>
+                  <div className="flex items-center gap-2 text-brand-gold opacity-100 transition-all transform translate-y-0">
+                    <span className="text-xs font-bold uppercase tracking-[0.2em]">Explore</span>
                     <ChevronRight size={16} />
                   </div>
                 </div>

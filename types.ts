@@ -22,6 +22,14 @@ export interface MenuItem {
   updatedAt?: string;
 }
 
+export interface MenuCategory {
+  id?: string;
+  categoryName: string;
+  categoryImageUrl: string;
+  isActive: boolean;
+  createdAt: string;
+}
+
 export interface CategoryConfig {
   name: string;
   image: string;

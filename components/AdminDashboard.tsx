@@ -11,14 +11,15 @@ import {
   getDoc,
   query,
   where,
-  addDoc
+  addDoc,
+  orderBy
 } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 import { 
   Plus, Trash2, Utensils, Calendar, 
   Tag, ShoppingBag, Clock, CheckCircle2, XCircle, LogOut, Truck, Sofa, Coffee, Check, AlertTriangle, Zap, User, ShieldCheck, Mail, Smartphone, Loader2,
-  Play, Volume2, VolumeX, Ban, Filter, BarChart3, CalendarDays, ChevronRight, Star, X, Coins, Wallet, CalendarCheck, Users, Phone, Search, CreditCard, Edit3, Image as ImageIcon, Eye, EyeOff
+  Play, Volume2, VolumeX, Ban, Filter, BarChart3, CalendarDays, ChevronRight, Star, X, Coins, Wallet, CalendarCheck, Users, Phone, Search, CreditCard, Edit3, Image as ImageIcon, Eye, EyeOff, Layers
 } from 'lucide-react';
-import { MenuItem, FestivalSpecial, CategoryConfig, Order, OrderStatus, SubscriptionRequest, OrderType, UserCategory, EventBooking, UserProfile } from '../types';
+import { MenuItem, MenuCategory, FestivalSpecial, CategoryConfig, Order, OrderStatus, SubscriptionRequest, OrderType, UserCategory, EventBooking, UserProfile } from '../types';
 import { getOptimizedImageURL } from '../constants';
 
 interface AdminDashboardProps {
@@ -39,6 +40,13 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
   const [isMenuFormOpen, setIsMenuFormOpen] = useState(false);
   const [editingMenuItem, setEditingMenuItem] = useState<(MenuItem & { id: string }) | null>(null);
   const [menuSearch, setMenuSearch] = useState('');
+  
+  // Category Management States
+  const [allMenuCategories, setAllMenuCategories] = useState<MenuCategory[]>([]);
+  const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
+  const [showAddNewCategoryInput, setShowAddNewCategoryInput] = useState(false);
+  const [newCategoryName, setNewCategoryName] = useState('');
+  
   const [menuForm, setMenuForm] = useState<Partial<MenuItem>>({
     itemName: '',
     priceNum: 0,
@@ -49,6 +57,12 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
     isAvailable: true,
     isRecommended: false,
     isNewItem: false
+  });
+
+  const [categoryForm, setCategoryForm] = useState<Partial<MenuCategory>>({
+    categoryName: '',
+    categoryImageUrl: '',
+    isActive: true
   });
 
   const [subscriptions, setSubscriptions] = useState<(SubscriptionRequest & { id: string })[]>([]);
@@ -96,6 +110,10 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
       setMenuItems(items);
     });
 
+    const unsubMenuCats = onSnapshot(query(collection(db, "menuCategories"), orderBy("categoryName")), (snapshot) => {
+      setAllMenuCategories(snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as MenuCategory)));
+    });
+
     const unsubFest = onSnapshot(collection(db, "festivals"), (snapshot) => {
       setFestivals(snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as any)));
     });
@@ -141,14 +159,78 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
     });
 
     return () => { 
-      unsubMenu(); unsubFest(); unsubCats(); unsubOrders(); unsubBookings(); unsubSubs(); unsubUsers();
+      unsubMenu(); unsubMenuCats(); unsubFest(); unsubCats(); unsubOrders(); unsubBookings(); unsubSubs(); unsubUsers();
     };
   }, [isSoundEnabled]);
+
+  // Category Helper Functions
+  const handleSaveCategory = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!categoryForm.categoryName || !categoryForm.categoryImageUrl) {
+      alert("Name and Image URL are required.");
+      return;
+    }
+
+    const isDuplicate = allMenuCategories.some(c => c.categoryName.toLowerCase() === categoryForm.categoryName?.toLowerCase());
+    if (isDuplicate) {
+      alert("This category already exists.");
+      return;
+    }
+
+    try {
+      const data = {
+        ...categoryForm,
+        createdAt: new Date().toISOString()
+      };
+      await addDoc(collection(db, "menuCategories"), data);
+      console.log("New category added:", categoryForm.categoryName);
+      setCategoryForm({ categoryName: '', categoryImageUrl: '', isActive: true });
+      setIsCategoryModalOpen(false);
+    } catch (err) {
+      alert("Error adding category.");
+    }
+  };
+
+  const handleToggleCategory = async (id: string, currentStatus: boolean) => {
+    try {
+      await updateDoc(doc(db, "menuCategories", id), { isActive: !currentStatus });
+      console.log("Category visibility changed:", id);
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const deleteCategory = async (id: string) => {
+    if (!window.confirm("Delete this category? Items linked to it will still exist but header will be missing.")) return;
+    try {
+      await deleteDoc(doc(db, "menuCategories", id));
+    } catch (err) { alert("Failed to delete category."); }
+  };
 
   // Menu Helper Functions
   const handleSaveMenuItem = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!menuForm.itemName || !menuForm.priceNum || !menuForm.category || !menuForm.backgroundImageUrl) {
+    
+    let finalCategory = menuForm.category;
+    
+    // Auto-create category if using "Add New"
+    if (showAddNewCategoryInput && newCategoryName) {
+      const isDuplicate = allMenuCategories.some(c => c.categoryName.toLowerCase() === newCategoryName.toLowerCase());
+      if (!isDuplicate) {
+        try {
+          await addDoc(collection(db, "menuCategories"), {
+            categoryName: newCategoryName,
+            categoryImageUrl: 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c', // Default placeholder
+            isActive: true,
+            createdAt: new Date().toISOString()
+          });
+          console.log("New category added via menu form:", newCategoryName);
+        } catch (err) { console.error(err); }
+      }
+      finalCategory = newCategoryName;
+    }
+
+    if (!menuForm.itemName || !menuForm.priceNum || !finalCategory || !menuForm.backgroundImageUrl) {
       alert("Please fill all required fields correctly.");
       return;
     }
@@ -156,6 +238,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
     try {
       const data = {
         ...menuForm,
+        category: finalCategory,
         name: menuForm.itemName, // Backward compatibility
         price: `₹${menuForm.priceNum}`, // Backward compatibility
         updatedAt: new Date().toISOString()
@@ -174,6 +257,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
 
       setIsMenuFormOpen(false);
       setEditingMenuItem(null);
+      setShowAddNewCategoryInput(false);
+      setNewCategoryName('');
       setMenuForm({
         itemName: '',
         priceNum: 0,
@@ -320,11 +405,11 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
                 <div className="flex items-center gap-6">
                   <div className="p-3 bg-brand-gold/10 rounded-xl text-brand-gold"><Utensils size={24} /></div>
                   <div>
-                    <h3 className="text-xl font-display text-white uppercase tracking-widest">Menu Management</h3>
-                    <p className="text-[10px] text-gray-500 uppercase font-bold tracking-widest">Organize items and promotional status</p>
+                    <h3 className="text-xl font-display text-white uppercase tracking-widest">Menu & Categories</h3>
+                    <p className="text-[10px] text-gray-500 uppercase font-bold tracking-widest">Organize items and visual category headers</p>
                   </div>
                 </div>
-                <div className="flex items-center gap-4 w-full md:w-auto">
+                <div className="flex flex-wrap items-center gap-4 w-full md:w-auto">
                    <div className="relative flex-1 md:w-64">
                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" size={14} />
                      <input 
@@ -335,6 +420,12 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
                        className="w-full bg-black/40 border border-gray-700 rounded-lg py-2 pl-10 pr-4 text-xs text-white focus:border-brand-gold outline-none"
                      />
                    </div>
+                   <button 
+                     onClick={() => setIsCategoryModalOpen(true)}
+                     className="px-6 py-2.5 border border-brand-gold text-brand-gold rounded-lg font-bold text-[10px] uppercase tracking-widest flex items-center gap-2 hover:bg-brand-gold hover:text-brand-black transition-all"
+                   >
+                     <Layers size={14} /> Categories
+                   </button>
                    <button 
                      onClick={() => { setEditingMenuItem(null); setMenuForm({ itemName: '', priceNum: 0, category: '', categoryType: 'Veg', description: '', backgroundImageUrl: '', isAvailable: true, isRecommended: false, isNewItem: false }); setIsMenuFormOpen(true); }}
                      className="px-6 py-2.5 bg-brand-gold text-brand-black rounded-lg font-bold text-[10px] uppercase tracking-widest flex items-center gap-2 hover:bg-white transition-all whitespace-nowrap"
@@ -555,7 +646,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
           <div className="bg-brand-dark border border-brand-gold/30 rounded-3xl p-8 w-full max-w-2xl shadow-2xl animate-fade-in-up">
             <div className="flex justify-between items-center mb-8">
               <h3 className="text-2xl font-display font-bold text-white uppercase tracking-widest">{editingMenuItem ? 'Edit Item' : 'New Menu Item'}</h3>
-              <button onClick={() => setIsMenuFormOpen(false)} className="text-gray-500 hover:text-white"><X /></button>
+              <button onClick={() => { setIsMenuFormOpen(false); setShowAddNewCategoryInput(false); }} className="text-gray-500 hover:text-white"><X /></button>
             </div>
             
             <form onSubmit={handleSaveMenuItem} className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -569,15 +660,44 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
               </div>
               <div className="space-y-2">
                 <label className="text-[10px] text-gray-500 uppercase font-bold tracking-widest">Category *</label>
-                <select required value={menuForm.category} onChange={e => setMenuForm({...menuForm, category: e.target.value})} className="w-full bg-black/40 border border-gray-700 rounded-xl p-3 text-white text-sm outline-none focus:border-brand-gold">
-                  <option value="">Select Category</option>
-                  <option value="Starters">Starters</option>
-                  <option value="Main Course">Main Course</option>
-                  <option value="Chinese">Chinese</option>
-                  <option value="Snacks">Snacks</option>
-                  <option value="Drinks">Drinks</option>
-                  <option value="Desserts">Desserts</option>
-                </select>
+                {!showAddNewCategoryInput ? (
+                  <select 
+                    required 
+                    value={menuForm.category} 
+                    onChange={e => {
+                      if (e.target.value === 'ADD_NEW') {
+                        setShowAddNewCategoryInput(true);
+                        setMenuForm({...menuForm, category: ''});
+                      } else {
+                        setMenuForm({...menuForm, category: e.target.value});
+                      }
+                    }} 
+                    className="w-full bg-black/40 border border-gray-700 rounded-xl p-3 text-white text-sm outline-none focus:border-brand-gold"
+                  >
+                    <option value="">Select Category</option>
+                    {allMenuCategories.map(cat => (
+                      <option key={cat.id} value={cat.categoryName}>{cat.categoryName}</option>
+                    ))}
+                    <option value="ADD_NEW" className="text-brand-gold font-bold">+ Add New Category</option>
+                  </select>
+                ) : (
+                  <div className="flex gap-2">
+                    <input 
+                      type="text" 
+                      placeholder="Category Name" 
+                      className="flex-1 bg-black/40 border border-brand-gold rounded-xl p-3 text-white text-sm outline-none"
+                      value={newCategoryName}
+                      onChange={(e) => setNewCategoryName(e.target.value)}
+                    />
+                    <button 
+                      type="button" 
+                      onClick={() => { setShowAddNewCategoryInput(false); setNewCategoryName(''); }}
+                      className="p-3 text-gray-500 hover:text-white"
+                    >
+                      <X size={16} />
+                    </button>
+                  </div>
+                )}
               </div>
               <div className="space-y-2">
                 <label className="text-[10px] text-gray-500 uppercase font-bold tracking-widest">Type *</label>
@@ -614,9 +734,84 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
 
               <div className="md:col-span-2 flex gap-4 pt-6">
                  <button type="submit" className="flex-1 py-4 bg-brand-gold text-brand-black rounded-xl text-xs font-bold uppercase tracking-widest hover:bg-white transition-all shadow-lg active:scale-95">Save Menu Item</button>
-                 <button type="button" onClick={() => setIsMenuFormOpen(false)} className="px-10 py-4 border border-gray-700 text-gray-500 rounded-xl text-xs font-bold uppercase tracking-widest hover:text-white">Cancel</button>
+                 <button type="button" onClick={() => { setIsMenuFormOpen(false); setShowAddNewCategoryInput(false); }} className="px-10 py-4 border border-gray-700 text-gray-500 rounded-xl text-xs font-bold uppercase tracking-widest hover:text-white">Cancel</button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Category Manager Modal */}
+      {isCategoryModalOpen && (
+        <div className="fixed inset-0 z-[120] bg-black/90 backdrop-blur-md flex items-center justify-center p-4 animate-fade-in">
+          <div className="bg-brand-dark border border-brand-gold/30 rounded-3xl p-8 w-full max-w-4xl shadow-2xl animate-fade-in-up flex flex-col max-h-[85vh]">
+            <div className="flex justify-between items-center mb-8 shrink-0">
+              <div>
+                <h3 className="text-2xl font-display font-bold text-white uppercase tracking-widest">Category Manager</h3>
+                <p className="text-[10px] text-gray-500 uppercase font-bold tracking-widest">Manage visual headers and groupings</p>
+              </div>
+              <button onClick={() => setIsCategoryModalOpen(false)} className="text-gray-500 hover:text-white"><X /></button>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 overflow-hidden">
+               {/* Left: Add Form */}
+               <div className="lg:col-span-1 border-r border-white/5 pr-8 overflow-y-auto">
+                 <h4 className="text-white font-bold text-sm uppercase tracking-widest mb-6">Create New</h4>
+                 <form onSubmit={handleSaveCategory} className="space-y-6">
+                    <div className="space-y-2">
+                      <label className="text-[10px] text-gray-500 uppercase font-bold tracking-widest">Name</label>
+                      <input 
+                        required 
+                        type="text" 
+                        className="w-full bg-black/40 border border-gray-700 rounded-xl p-3 text-white text-sm outline-none focus:border-brand-gold"
+                        value={categoryForm.categoryName}
+                        onChange={(e) => setCategoryForm({...categoryForm, categoryName: e.target.value})}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-[10px] text-gray-500 uppercase font-bold tracking-widest">Google Drive Image Link</label>
+                      <input 
+                        required 
+                        type="text" 
+                        className="w-full bg-black/40 border border-gray-700 rounded-xl p-3 text-white text-sm outline-none focus:border-brand-gold"
+                        placeholder="Headers look best at 16:9"
+                        value={categoryForm.categoryImageUrl}
+                        onChange={(e) => setCategoryForm({...categoryForm, categoryImageUrl: e.target.value})}
+                      />
+                    </div>
+                    <button type="submit" className="w-full py-4 bg-brand-gold text-brand-black font-bold uppercase tracking-widest rounded-xl text-xs shadow-lg hover:bg-white transition-all">Add Category</button>
+                 </form>
+               </div>
+
+               {/* Right: Category List */}
+               <div className="lg:col-span-2 overflow-y-auto pr-2">
+                 <h4 className="text-white font-bold text-sm uppercase tracking-widest mb-6">Existing Categories ({allMenuCategories.length})</h4>
+                 <div className="grid grid-cols-1 gap-4">
+                    {allMenuCategories.map(cat => (
+                      <div key={cat.id} className="bg-black/40 rounded-2xl border border-white/5 p-4 flex items-center justify-between group">
+                         <div className="flex items-center gap-4">
+                            <div className="w-16 h-10 rounded-lg overflow-hidden border border-white/10 bg-gray-900 shrink-0">
+                               <img src={getOptimizedImageURL(cat.categoryImageUrl)} className="w-full h-full object-cover" alt="" />
+                            </div>
+                            <div>
+                               <h5 className="text-white font-bold text-sm">{cat.categoryName}</h5>
+                               <p className="text-[9px] text-gray-500 uppercase font-bold tracking-widest">{cat.isActive ? 'Visible' : 'Hidden'}</p>
+                            </div>
+                         </div>
+                         <div className="flex items-center gap-4">
+                            <button 
+                              onClick={() => handleToggleCategory(cat.id!, cat.isActive)}
+                              className={`p-2 rounded-lg transition-all ${cat.isActive ? 'text-green-500 bg-green-500/10' : 'text-gray-600 bg-gray-800'}`}
+                            >
+                              {cat.isActive ? <Eye size={18} /> : <EyeOff size={18} />}
+                            </button>
+                            <button onClick={() => deleteCategory(cat.id!)} className="p-2 text-gray-700 hover:text-red-500 transition-colors"><Trash2 size={18} /></button>
+                         </div>
+                      </div>
+                    ))}
+                 </div>
+               </div>
+            </div>
           </div>
         </div>
       )}
