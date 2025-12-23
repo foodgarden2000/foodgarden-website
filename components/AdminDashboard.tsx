@@ -24,7 +24,7 @@ interface AdminDashboardProps {
 
 type TimeFilter = 'today' | 'week' | 'month' | 'year' | 'custom';
 type OrderCategory = 'delivery' | 'table_booking' | 'cabin_booking';
-type UserTypeFilter = 'all' | UserCategory;
+type UserTypeFilter = 'all' | 'registered' | 'subscriber';
 
 const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
   const [activeTab, setActiveTab] = useState<'menu' | 'festivals' | 'orders' | 'subscriptions'>('orders');
@@ -329,7 +329,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
   const pendingSubs = subscriptions.filter(s => s.status === 'pending');
 
   const getUserTypeBadge = (type: UserCategory | undefined) => {
-    const category = type || 'normal';
+    const category = type || 'registered';
     switch (category) {
       case 'subscriber':
         return (
@@ -344,9 +344,10 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
           </span>
         );
       default:
+        // Handle existing guest orders badge if they still exist in DB
         return (
           <span className="bg-gray-600 text-gray-200 px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest">
-            Guest User
+            Legacy Guest
           </span>
         );
     }
@@ -512,13 +513,13 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
 
                   {/* User Type Filter */}
                   <div className="flex gap-2 p-1 bg-brand-dark/40 rounded-2xl border border-brand-gold/10">
-                    {(['all', 'normal', 'registered', 'subscriber'] as UserTypeFilter[]).map(f => (
+                    {(['all', 'registered', 'subscriber'] as UserTypeFilter[]).map(f => (
                       <button 
                         key={f}
                         onClick={() => setUserTypeFilter(f)}
                         className={`flex-1 py-4 rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all ${userTypeFilter === f ? 'bg-brand-gold text-brand-black shadow-lg' : 'text-gray-400 hover:text-white'}`}
                       >
-                        {f === 'all' ? 'All Users' : f === 'normal' ? 'Guests' : f === 'registered' ? 'Members' : 'VIPs'}
+                        {f === 'all' ? 'All Members' : f === 'registered' ? 'Regular' : 'VIPs'}
                       </button>
                     ))}
                   </div>
@@ -606,7 +607,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
                                   )}
                                 </div>
                                 <p className="text-sm text-gray-500 font-medium flex items-center gap-2">
-                                  <User size={14} className="text-brand-gold" /> {order.userName || 'Guest'} • {order.userPhone}
+                                  <User size={14} className="text-brand-gold" /> {order.userName || 'Member'} • {order.userPhone}
                                 </p>
                                 <div className="mt-5 flex flex-wrap items-center gap-4 text-[10px] font-bold uppercase tracking-widest">
                                   <div className="bg-gray-900 text-gray-400 px-4 py-1.5 rounded-full border border-white/5 flex items-center gap-2">
@@ -616,7 +617,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
                                     <CalendarDays size={12} /> {new Date(order.createdAt).toLocaleString()}
                                   </div>
                                   <div className="bg-gray-900 text-gray-400 px-4 py-1.5 rounded-full border border-white/5 flex items-center gap-2">
-                                    <Zap size={12} /> Category: <span className="text-brand-gold capitalize">{order.userType || 'normal'}</span>
+                                    <Zap size={12} /> Category: <span className="text-brand-gold capitalize">{order.userType || 'registered'}</span>
                                   </div>
                                 </div>
                                 {(order.rejectReason || order.cancelReason) && (
@@ -667,10 +668,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
               </div>
             </div>
           )}
-          {/* ... other tabs ... */}
         </div>
       </div>
-      {/* ... action modals ... */}
     </div>
   );
 };

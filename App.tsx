@@ -57,7 +57,6 @@ const App: React.FC = () => {
         // Force reset to home view only if staff was logged in
         setCurrentView('home');
       }
-      // Note: We allow non-logged-in users to remain in 'dashboard' for guest tracking
     });
 
     const fetchContactInfo = async () => {
@@ -148,14 +147,23 @@ const App: React.FC = () => {
             <Hero contactInfo={contactInfo} />
             <About />
             <FestiveSpecials whatsappNumber={contactInfo.whatsapp} />
-            <Menu whatsappNumber={contactInfo.whatsapp} user={user} currentPoints={points} />
+            <Menu 
+              whatsappNumber={contactInfo.whatsapp} 
+              user={user} 
+              currentPoints={points} 
+              onNavigate={() => navigateTo('dashboard')} 
+            />
             <Gallery />
-            <Reservation whatsappNumber={contactInfo.whatsapp} />
+            <Reservation 
+              whatsappNumber={contactInfo.whatsapp} 
+              user={user}
+              onNavigate={() => navigateTo('dashboard')}
+            />
             <Testimonials />
           </>
         )}
 
-        {(currentView === 'dashboard' || currentView === 'admin') && (
+        {currentView === 'dashboard' && (
           <Dashboard 
             user={user} 
             points={points} 

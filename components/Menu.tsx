@@ -11,9 +11,10 @@ interface MenuProps {
   whatsappNumber: string;
   user: User | null;
   currentPoints: number;
+  onNavigate: () => void;
 }
 
-const Menu: React.FC<MenuProps> = ({ whatsappNumber, user, currentPoints }) => {
+const Menu: React.FC<MenuProps> = ({ whatsappNumber, user, currentPoints, onNavigate }) => {
   const [items, setItems] = useState<MenuItem[]>([]);
   const [categoryConfigs, setCategoryConfigs] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
@@ -68,29 +69,32 @@ const Menu: React.FC<MenuProps> = ({ whatsappNumber, user, currentPoints }) => {
     return Math.floor(total * rate);
   };
 
+  const handleOrderClick = (item: MenuItem) => {
+    if (!user) {
+      console.log("User not logged in → redirecting to login");
+      alert("Please login or register to place an order.");
+      onNavigate();
+      return;
+    }
+    setSelectedOrderItem(item);
+    setIsOrderModalOpen(true);
+  };
+
   const submitOrder = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedOrderItem) return;
+    if (!selectedOrderItem || !user) return;
 
     const cleanPrice = parseInt(selectedOrderItem.price?.replace(/\D/g, '') || "0");
     const potentialPoints = calculatePotentialPoints(selectedOrderItem.price || "0", orderFormData.quantity);
 
-    // Identify User Type
-    let userType: UserCategory = 'normal';
-    let guestToken: string | undefined = undefined;
-    if (user) {
-      userType = userProfile?.role === 'subscriber' ? 'subscriber' : 'registered';
-    } else {
-      // Generate secure cancellation token for guests
-      guestToken = crypto.randomUUID();
-    }
+    // Identify User Type - Only registered/subscriber allowed
+    const userType: UserCategory = userProfile?.role === 'subscriber' ? 'subscriber' : 'registered';
 
     console.log("Submitting Order | User Type:", userType);
 
     const orderData: Order = {
-      userId: user?.uid || null,
+      userId: user.uid,
       userType: userType,
-      guestCancelToken: guestToken,
       userName: orderFormData.name,
       userPhone: orderFormData.phone,
       address: orderFormData.address,
@@ -108,11 +112,6 @@ const Menu: React.FC<MenuProps> = ({ whatsappNumber, user, currentPoints }) => {
     try {
       const docRef = await addDoc(collection(db, "orders"), orderData);
       
-      // Store token in localStorage if guest
-      if (guestToken) {
-        localStorage.setItem(`guestOrderToken_${docRef.id}`, guestToken);
-      }
-
       const message = `*NEW ${orderFormData.type.replace('_', ' ').toUpperCase()} (${userType.toUpperCase()}) - Chef's Jalsa*\n` +
                       `*Order ID:* ${docRef.id}\n` +
                       `*Item:* ${selectedOrderItem.name}\n` +
@@ -120,12 +119,12 @@ const Menu: React.FC<MenuProps> = ({ whatsappNumber, user, currentPoints }) => {
                       `*Total:* ₹${orderData.orderAmount}\n\n` +
                       `*Customer Details:*\n👤 ${orderFormData.name}\n📞 ${orderFormData.phone}\n📍 ${orderFormData.address}\n` +
                       (orderFormData.notes ? `📝 Notes: ${orderFormData.notes}\n` : '') +
-                      (user ? `\n_Points will be credited upon completion!_` : `\n_You can cancel this order from this device!_`);
+                      `\n_Points will be credited upon completion!_`;
 
       window.open(`https://wa.me/${whatsappNumber}?text=${encodeURIComponent(message)}`, '_blank');
       
       setIsOrderModalOpen(false);
-      alert(`Order submitted successfully! ${!user ? 'You can track and cancel this order from the Dashboard on this device.' : 'You can track live status in your dashboard.'}`);
+      alert("Order submitted successfully! You can track live status in your dashboard.");
     } catch (err) { 
       console.error(err);
       alert("Error processing order. Please try again.");
@@ -209,7 +208,7 @@ const Menu: React.FC<MenuProps> = ({ whatsappNumber, user, currentPoints }) => {
                       <span className="text-brand-gold font-bold text-lg">{item.price}</span>
                     </div>
                     <p className="text-gray-500 text-sm mb-8 flex-1 leading-relaxed">{item.description}</p>
-                    <button onClick={() => { setSelectedOrderItem(item); setIsOrderModalOpen(true); }} className="w-full py-4 bg-brand-dark text-white rounded-lg font-bold uppercase text-xs tracking-widest hover:bg-brand-gold hover:text-brand-black transition-all shadow-md active:scale-95">
+                    <button onClick={() => handleOrderClick(item)} className="w-full py-4 bg-brand-dark text-white rounded-lg font-bold uppercase text-xs tracking-widest hover:bg-brand-gold hover:text-brand-black transition-all shadow-md active:scale-95">
                       {userProfile?.role === 'subscriber' ? 'Order (Premium Rate Enabled)' : user ? 'Order & Earn Points' : 'Order Now'}
                     </button>
                   </div>
@@ -220,7 +219,7 @@ const Menu: React.FC<MenuProps> = ({ whatsappNumber, user, currentPoints }) => {
         )}
       </div>
 
-      {isOrderModalOpen && selectedOrderItem && (
+      {isOrderModalOpen && selectedOrderItem && user && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/90 backdrop-blur-md animate-fade-in">
           <div className="bg-white rounded-2xl w-full max-w-lg overflow-hidden animate-fade-in-up shadow-2xl flex flex-col max-h-[90vh]">
             <div className="p-6 bg-brand-dark text-white flex justify-between items-center shrink-0">
@@ -250,16 +249,14 @@ const Menu: React.FC<MenuProps> = ({ whatsappNumber, user, currentPoints }) => {
                 ))}
               </div>
 
-              {user && (
-                <div className="bg-brand-gold/10 p-5 rounded-xl border border-brand-gold/30 flex items-center justify-between">
-                  <div>
-                    <span className="text-xs font-bold text-brand-black/60 uppercase tracking-widest block mb-1">Potential Rewards</span>
-                    <span className="text-2xl font-display font-bold text-brand-red">+{calculatePotentialPoints(selectedOrderItem.price || "0", orderFormData.quantity)} Points</span>
-                    {userProfile?.role === 'subscriber' && <p className="text-[10px] text-brand-gold font-bold uppercase mt-1">15% Premium Rate Active</p>}
-                  </div>
-                  <Award size={32} className="text-brand-gold" />
+              <div className="bg-brand-gold/10 p-5 rounded-xl border border-brand-gold/30 flex items-center justify-between">
+                <div>
+                  <span className="text-xs font-bold text-brand-black/60 uppercase tracking-widest block mb-1">Potential Rewards</span>
+                  <span className="text-2xl font-display font-bold text-brand-red">+{calculatePotentialPoints(selectedOrderItem.price || "0", orderFormData.quantity)} Points</span>
+                  {userProfile?.role === 'subscriber' && <p className="text-[10px] text-brand-gold font-bold uppercase mt-1">15% Premium Rate Active</p>}
                 </div>
-              )}
+                <Award size={32} className="text-brand-gold" />
+              </div>
               
               <div className="flex items-center justify-between border-b border-gray-100 pb-6">
                 <div className="flex-1">

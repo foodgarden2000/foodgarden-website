@@ -3,7 +3,6 @@ import React, { useState, useEffect } from 'react';
 import { User as FirebaseUser, signOut } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
 import { auth, db } from '../firebase';
 import Auth from './Auth';
-// Added Tag to the imports from lucide-react
 import { 
   ArrowLeft, Award, LogOut, User, ShoppingBag, Clock, Share2, Copy, Check, Gift, Truck, Coffee, Sofa, AlertCircle, Loader2, Smartphone, ShieldCheck, Zap, CreditCard, ExternalLink, ArrowRight, Ban, XCircle, Search, Tag
 } from 'lucide-react';
@@ -39,9 +38,6 @@ const Dashboard: React.FC<DashboardProps> = ({ user, points, onBack, adminMode, 
   const [loadingProfile, setLoadingProfile] = useState(true);
   const [orderError, setOrderError] = useState<string | null>(null);
 
-  // Guest Order Tracking
-  const [guestOrderIds, setGuestOrderIds] = useState<string[]>([]);
-
   // Order Cancellation States
   const [cancellingOrder, setCancellingOrder] = useState<string | null>(null);
   const [cancelReason, setCancelReason] = useState('');
@@ -53,15 +49,8 @@ const Dashboard: React.FC<DashboardProps> = ({ user, points, onBack, adminMode, 
   const [txnId, setTxnId] = useState('');
 
   useEffect(() => {
-    // If no user, load guest orders from local storage
     if (!user) {
       setLoadingProfile(false);
-      const keys = Object.keys(localStorage);
-      const guestIds = keys
-        .filter(k => k.startsWith('guestOrderToken_'))
-        .map(k => k.split('_')[1]);
-      setGuestOrderIds(guestIds);
-      setActiveTab('orders'); // Guests only care about orders
       return;
     }
 
@@ -110,50 +99,14 @@ const Dashboard: React.FC<DashboardProps> = ({ user, points, onBack, adminMode, 
     return () => { unsubProfile(); unsubOrders(); unsubSub(); };
   }, [user]);
 
-  // Listener for guest orders
-  useEffect(() => {
-    if (user || guestOrderIds.length === 0) return;
-
-    // Firebase doesn't support 'in' with documentId() for many IDs efficiently in a simple query, 
-    // but for a small list of local guest orders, we can subscribe to individual docs.
-    const unsubscribes = guestOrderIds.map(id => 
-      onSnapshot(doc(db, "orders", id), (snap) => {
-        if (snap.exists()) {
-          setMyOrders(prev => {
-            const filtered = prev.filter(o => o.id !== id);
-            const updated = [...filtered, { id: snap.id, ...snap.data() } as Order];
-            return updated.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-          });
-        }
-      })
-    );
-
-    return () => unsubscribes.forEach(unsub => unsub());
-  }, [guestOrderIds, user]);
-
   const handleCancelOrder = async () => {
-    if (!cancellingOrder) return;
+    if (!cancellingOrder || !user) return;
     const reason = cancelReason === 'Other' ? customCancelReason : cancelReason;
     
     if (!window.confirm("Are you sure you want to cancel this order?")) return;
 
     try {
       const orderRef = doc(db, "orders", cancellingOrder);
-      const orderSnap = await getDoc(orderRef);
-      
-      if (!orderSnap.exists()) return;
-      const orderData = orderSnap.data() as Order;
-
-      // Security check for guests
-      if (!user) {
-        const localToken = localStorage.getItem(`guestOrderToken_${cancellingOrder}`);
-        if (localToken !== orderData.guestCancelToken) {
-          alert("You are not authorized to cancel this order.");
-          return;
-        }
-      }
-
-      console.log(`${user ? 'MEMBER' : 'GUEST'} CANCELLING: Order ${cancellingOrder}`);
       
       await updateDoc(orderRef, {
         status: 'cancelled_by_user',
@@ -162,7 +115,6 @@ const Dashboard: React.FC<DashboardProps> = ({ user, points, onBack, adminMode, 
         updatedAt: new Date().toISOString()
       });
 
-      console.log("Guest cancel verified:", cancellingOrder);
       alert("Order cancelled successfully.");
       setCancellingOrder(null);
       setCancelReason('');
@@ -214,6 +166,10 @@ const Dashboard: React.FC<DashboardProps> = ({ user, points, onBack, adminMode, 
     });
   };
 
+  if (!user) {
+    return <Auth externalReferralCode={referralCodeFromUrl} />;
+  }
+
   return (
     <div className="pt-32 pb-24 min-h-screen bg-brand-cream relative overflow-hidden">
       <div className="container mx-auto px-4 md:px-8 relative z-10">
@@ -222,51 +178,37 @@ const Dashboard: React.FC<DashboardProps> = ({ user, points, onBack, adminMode, 
         <div className="flex flex-col md:flex-row items-center justify-between mb-12 gap-6">
           <div className="flex items-center gap-6">
             <div className="w-16 h-16 bg-brand-dark rounded-full flex items-center justify-center text-brand-gold border-2 border-brand-gold shadow-xl">
-              {user ? <User size={32} /> : <Search size={32} />}
+              <User size={32} />
             </div>
             <div>
               <div className="flex items-center gap-2">
                 <h2 className="text-2xl font-display font-bold text-brand-black">
-                  {user ? (profile?.name || 'Member') : 'Guest Order Tracking'}
+                  {profile?.name || 'Member'}
                 </h2>
                 {profile?.role === 'subscriber' && (
                   <span className="bg-brand-red text-white px-3 py-1 rounded text-[8px] font-bold uppercase flex items-center gap-1 shadow-lg">
                     <ShieldCheck size={10} fill="currentColor" /> Premium Subscriber
                   </span>
                 )}
-                {!user && (
-                  <span className="bg-gray-200 text-gray-600 px-3 py-1 rounded text-[8px] font-bold uppercase tracking-widest">
-                    Guest Mode (Device Bound)
-                  </span>
-                )}
               </div>
-              <p className="text-gray-500 text-xs font-sans">{user ? user.email : 'Tracking recent orders from this browser session'}</p>
+              <p className="text-gray-500 text-xs font-sans">{user.email}</p>
             </div>
           </div>
           
           <div className="flex bg-white p-1 rounded-xl shadow-sm border border-gray-100 overflow-x-auto max-w-full">
-            {user && (
-              <>
-                <button onClick={() => setActiveTab('profile')} className={`px-6 py-2 rounded-lg text-xs font-bold uppercase tracking-widest whitespace-nowrap ${activeTab === 'profile' ? 'bg-brand-dark text-white' : 'text-gray-400'}`}>Profile</button>
-                <button onClick={() => setActiveTab('orders')} className={`px-6 py-2 rounded-lg text-xs font-bold uppercase tracking-widest whitespace-nowrap ${activeTab === 'orders' ? 'bg-brand-dark text-white' : 'text-gray-400'}`}>Orders</button>
-                {profile?.role !== 'subscriber' && (
-                  <button onClick={() => setActiveTab('subscription')} className={`px-6 py-2 rounded-lg text-xs font-bold uppercase tracking-widest flex items-center gap-2 whitespace-nowrap ${activeTab === 'subscription' ? 'bg-brand-red text-white' : 'text-brand-red'}`}>
-                    <Zap size={12} /> Subscribe
-                  </button>
-                )}
-                <button onClick={() => signOut(auth)} className="px-6 py-2 rounded-lg text-xs font-bold uppercase tracking-widest text-brand-red">Logout</button>
-              </>
-            )}
-            {!user && (
-              <button onClick={onBack} className="px-6 py-2 rounded-lg text-xs font-bold uppercase tracking-widest text-brand-gold flex items-center gap-2">
-                <ArrowLeft size={14} /> Back to Home
+            <button onClick={() => setActiveTab('profile')} className={`px-6 py-2 rounded-lg text-xs font-bold uppercase tracking-widest whitespace-nowrap ${activeTab === 'profile' ? 'bg-brand-dark text-white' : 'text-gray-400'}`}>Profile</button>
+            <button onClick={() => setActiveTab('orders')} className={`px-6 py-2 rounded-lg text-xs font-bold uppercase tracking-widest whitespace-nowrap ${activeTab === 'orders' ? 'bg-brand-dark text-white' : 'text-gray-400'}`}>Orders</button>
+            {profile?.role !== 'subscriber' && (
+              <button onClick={() => setActiveTab('subscription')} className={`px-6 py-2 rounded-lg text-xs font-bold uppercase tracking-widest flex items-center gap-2 whitespace-nowrap ${activeTab === 'subscription' ? 'bg-brand-red text-white' : 'text-brand-red'}`}>
+                <Zap size={12} /> Subscribe
               </button>
             )}
+            <button onClick={() => signOut(auth)} className="px-6 py-2 rounded-lg text-xs font-bold uppercase tracking-widest text-brand-red">Logout</button>
           </div>
         </div>
 
         {/* Content Tabs */}
-        {activeTab === 'profile' && user && (
+        {activeTab === 'profile' && (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
             <div className="bg-brand-dark p-8 rounded-2xl border border-brand-gold/30 shadow-2xl flex flex-col items-center text-center group">
               <Award size={48} className="text-brand-gold mb-4" />
@@ -290,7 +232,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, points, onBack, adminMode, 
           </div>
         )}
 
-        {activeTab === 'subscription' && user && (
+        {activeTab === 'subscription' && (
           <div className="max-w-4xl mx-auto">
             {profile?.role === 'subscriber' ? (
                <div className="bg-brand-dark p-12 rounded-3xl border border-brand-gold/30 text-center">
@@ -354,7 +296,6 @@ const Dashboard: React.FC<DashboardProps> = ({ user, points, onBack, adminMode, 
               <div className="text-center py-24 bg-white rounded-3xl shadow-sm border border-gray-100 animate-fade-in">
                 <ShoppingBag size={48} className="text-gray-200 mx-auto mb-4" />
                 <h3 className="text-xl font-serif text-gray-500">No active orders found</h3>
-                {!user && <p className="text-xs text-gray-400 mt-2 px-12">Orders placed as guest on this device will appear here once submitted.</p>}
               </div>
             ) : (
               myOrders.map(order => (
@@ -369,7 +310,6 @@ const Dashboard: React.FC<DashboardProps> = ({ user, points, onBack, adminMode, 
                     <div className="flex items-center flex-wrap gap-4 text-[10px] text-gray-500 font-bold uppercase tracking-widest">
                        <span className="flex items-center gap-1.5"><Clock size={12} className="text-brand-gold" /> {new Date(order.createdAt).toLocaleDateString()}</span>
                        <span className="flex items-center gap-1.5"><Tag size={12} className="text-brand-gold" /> {order.orderType.replace(/_/g, ' ')}</span>
-                       {order.userType === 'normal' && <span className="flex items-center gap-1.5 text-blue-500"><Search size={12} /> Guest Order</span>}
                     </div>
                     
                     {(order.status === 'rejected' || order.status.includes('cancelled')) && (order.rejectReason || order.cancelReason) && (
@@ -395,7 +335,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, points, onBack, adminMode, 
                   </div>
                   <div className="text-right shrink-0">
                     <p className="text-3xl font-display font-bold text-brand-black">₹{order.orderAmount}</p>
-                    {order.status === 'delivered' && user && <p className="text-xs text-brand-gold font-bold">+{order.pointsEarned} Points Added</p>}
+                    {order.status === 'delivered' && <p className="text-xs text-brand-gold font-bold">+{order.pointsEarned} Points Added</p>}
                     {(order.status === 'rejected' || order.status.includes('cancelled')) && <p className="text-[10px] text-red-400 font-bold uppercase tracking-widest mt-1">Closed</p>}
                   </div>
                 </div>
@@ -434,11 +374,6 @@ const Dashboard: React.FC<DashboardProps> = ({ user, points, onBack, adminMode, 
                 <button onClick={() => { setCancellingOrder(null); setCancelReason(''); setCustomCancelReason(''); }} className="px-8 py-4 bg-gray-100 text-gray-500 rounded-xl text-xs font-bold uppercase tracking-widest hover:bg-gray-200 transition-all">Keep Order</button>
               </div>
             </div>
-            {!user && (
-              <p className="mt-6 text-[9px] text-gray-400 text-center uppercase font-bold tracking-tighter">
-                Cancellation strictly verified via secure device token.
-              </p>
-            )}
           </div>
         </div>
       )}

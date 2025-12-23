@@ -2,13 +2,16 @@
 import React, { useState, useEffect } from 'react';
 import { db, auth } from '../firebase';
 import { collection, addDoc, doc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+import { User } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
 import { OrderType, UserCategory, UserProfile } from '../types';
 
 interface ReservationProps {
   whatsappNumber: string;
+  user: User | null;
+  onNavigate: () => void;
 }
 
-const Reservation: React.FC<ReservationProps> = ({ whatsappNumber }) => {
+const Reservation: React.FC<ReservationProps> = ({ whatsappNumber, user, onNavigate }) => {
   const [formData, setFormData] = useState({
     name: '',
     phone: '',
@@ -21,14 +24,13 @@ const Reservation: React.FC<ReservationProps> = ({ whatsappNumber }) => {
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
 
   useEffect(() => {
-    const user = auth.currentUser;
     if (user) {
       const unsub = onSnapshot(doc(db, "users", user.uid), (snap) => {
         if (snap.exists()) setUserProfile(snap.data() as UserProfile);
       });
       return () => unsub();
     }
-  }, []);
+  }, [user]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -37,18 +39,20 @@ const Reservation: React.FC<ReservationProps> = ({ whatsappNumber }) => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    const user = auth.currentUser;
+    if (!user) {
+      console.log("User not logged in → redirecting to login");
+      alert("Please login or register to place an order.");
+      onNavigate();
+      return;
+    }
 
     // Identify User Type
-    let userType: UserCategory = 'normal';
-    if (user) {
-      userType = userProfile?.role === 'subscriber' ? 'subscriber' : 'registered';
-    }
+    const userType: UserCategory = userProfile?.role === 'subscriber' ? 'subscriber' : 'registered';
 
     console.log("Submitting Booking | User Type:", userType);
 
     const orderData = {
-      userId: user?.uid || null,
+      userId: user.uid,
       userType: userType,
       userName: formData.name,
       userPhone: formData.phone,
