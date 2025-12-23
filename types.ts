@@ -23,6 +23,7 @@ export interface Order {
   id?: string;
   userId: string | null;
   userType: UserCategory;
+  guestCancelToken?: string; // Secure token for guest cancellations
   userName: string;
   userPhone: string;
   address: string;

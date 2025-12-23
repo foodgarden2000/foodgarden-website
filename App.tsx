@@ -53,10 +53,11 @@ const App: React.FC = () => {
       
       if (currentUser?.email === 'admin@chefsjalsa.com') {
         setCurrentView('admin');
-      } else if (!currentUser && currentView !== 'home') {
-        // Force reset to home view if user is signed out
+      } else if (!currentUser && currentView === 'admin') {
+        // Force reset to home view only if staff was logged in
         setCurrentView('home');
       }
+      // Note: We allow non-logged-in users to remain in 'dashboard' for guest tracking
     });
 
     const fetchContactInfo = async () => {
@@ -154,21 +155,12 @@ const App: React.FC = () => {
           </>
         )}
 
-        {currentView === 'dashboard' && (
+        {(currentView === 'dashboard' || currentView === 'admin') && (
           <Dashboard 
             user={user} 
             points={points} 
             onBack={() => navigateTo('home')} 
-            referralCodeFromUrl={capturedReferralCode}
-          />
-        )}
-
-        {currentView === 'admin' && (
-          <Dashboard 
-            user={user} 
-            points={points} 
-            onBack={() => navigateTo('home')} 
-            adminMode 
+            adminMode={isAdmin}
             referralCodeFromUrl={capturedReferralCode}
           />
         )}

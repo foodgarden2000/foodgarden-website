@@ -77,8 +77,12 @@ const Menu: React.FC<MenuProps> = ({ whatsappNumber, user, currentPoints }) => {
 
     // Identify User Type
     let userType: UserCategory = 'normal';
+    let guestToken: string | undefined = undefined;
     if (user) {
       userType = userProfile?.role === 'subscriber' ? 'subscriber' : 'registered';
+    } else {
+      // Generate secure cancellation token for guests
+      guestToken = crypto.randomUUID();
     }
 
     console.log("Submitting Order | User Type:", userType);
@@ -86,6 +90,7 @@ const Menu: React.FC<MenuProps> = ({ whatsappNumber, user, currentPoints }) => {
     const orderData: Order = {
       userId: user?.uid || null,
       userType: userType,
+      guestCancelToken: guestToken,
       userName: orderFormData.name,
       userPhone: orderFormData.phone,
       address: orderFormData.address,
@@ -103,6 +108,11 @@ const Menu: React.FC<MenuProps> = ({ whatsappNumber, user, currentPoints }) => {
     try {
       const docRef = await addDoc(collection(db, "orders"), orderData);
       
+      // Store token in localStorage if guest
+      if (guestToken) {
+        localStorage.setItem(`guestOrderToken_${docRef.id}`, guestToken);
+      }
+
       const message = `*NEW ${orderFormData.type.replace('_', ' ').toUpperCase()} (${userType.toUpperCase()}) - Chef's Jalsa*\n` +
                       `*Order ID:* ${docRef.id}\n` +
                       `*Item:* ${selectedOrderItem.name}\n` +
@@ -110,12 +120,12 @@ const Menu: React.FC<MenuProps> = ({ whatsappNumber, user, currentPoints }) => {
                       `*Total:* ₹${orderData.orderAmount}\n\n` +
                       `*Customer Details:*\n👤 ${orderFormData.name}\n📞 ${orderFormData.phone}\n📍 ${orderFormData.address}\n` +
                       (orderFormData.notes ? `📝 Notes: ${orderFormData.notes}\n` : '') +
-                      (user ? `\n_Points will be credited upon completion!_` : '');
+                      (user ? `\n_Points will be credited upon completion!_` : `\n_You can cancel this order from this device!_`);
 
       window.open(`https://wa.me/${whatsappNumber}?text=${encodeURIComponent(message)}`, '_blank');
       
       setIsOrderModalOpen(false);
-      alert("Order submitted to Chef's Jalsa! You can track live status in your dashboard.");
+      alert(`Order submitted successfully! ${!user ? 'You can track and cancel this order from the Dashboard on this device.' : 'You can track live status in your dashboard.'}`);
     } catch (err) { 
       console.error(err);
       alert("Error processing order. Please try again.");
