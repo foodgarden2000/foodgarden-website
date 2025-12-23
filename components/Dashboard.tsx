@@ -4,7 +4,7 @@ import { User as FirebaseUser, signOut } from "https://www.gstatic.com/firebasej
 import { auth, db } from '../firebase';
 import Auth from './Auth';
 import { 
-  ArrowLeft, Award, LogOut, User, ShoppingBag, Clock, Share2, Copy, Check, Gift, Truck, Coffee, Sofa, AlertCircle, Loader2, Smartphone, ShieldCheck, Zap, CreditCard, ExternalLink, ArrowRight, Ban
+  ArrowLeft, Award, LogOut, User, ShoppingBag, Clock, Share2, Copy, Check, Gift, Truck, Coffee, Sofa, AlertCircle, Loader2, Smartphone, ShieldCheck, Zap, CreditCard, ExternalLink, ArrowRight, Ban, XCircle
 } from 'lucide-react';
 import { 
   doc, 
@@ -13,6 +13,7 @@ import {
   query, 
   where, 
   addDoc,
+  updateDoc,
   limit
 } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 import { UserProfile, Order, OrderStatus, SubscriptionRequest } from '../types';
@@ -34,6 +35,11 @@ const Dashboard: React.FC<DashboardProps> = ({ user, points, onBack, adminMode, 
   const [copied, setCopied] = useState(false);
   const [loadingProfile, setLoadingProfile] = useState(true);
   const [orderError, setOrderError] = useState<string | null>(null);
+
+  // Order Cancellation States
+  const [cancellingOrder, setCancellingOrder] = useState<string | null>(null);
+  const [cancelReason, setCancelReason] = useState('');
+  const [customCancelReason, setCustomCancelReason] = useState('');
 
   // Subscription Flow States
   const [subStep, setSubStep] = useState<SubStep>('IDLE');
@@ -90,6 +96,31 @@ const Dashboard: React.FC<DashboardProps> = ({ user, points, onBack, adminMode, 
 
     return () => { unsubProfile(); unsubOrders(); unsubSub(); };
   }, [user]);
+
+  const handleCancelOrderByUser = async () => {
+    if (!cancellingOrder) return;
+    const reason = cancelReason === 'Other' ? customCancelReason : cancelReason;
+    
+    if (!window.confirm("Are you sure you want to cancel this order?")) return;
+
+    try {
+      console.log(`USER CANCELLING: Order ${cancellingOrder}`);
+      const orderRef = doc(db, "orders", cancellingOrder);
+      await updateDoc(orderRef, {
+        status: 'cancelled_by_user',
+        cancelReason: reason || 'User initiated cancellation',
+        cancelledBy: 'user',
+        updatedAt: new Date().toISOString()
+      });
+      alert("Order cancelled successfully.");
+      setCancellingOrder(null);
+      setCancelReason('');
+      setCustomCancelReason('');
+    } catch (err) {
+      console.error("User cancellation error:", err);
+      alert("Failed to cancel order. Please try again.");
+    }
+  };
 
   const handleSubscribe = (plan: {name: string, price: string}) => {
     setSelectedPlan(plan);
@@ -278,32 +309,44 @@ const Dashboard: React.FC<DashboardProps> = ({ user, points, onBack, adminMode, 
               </div>
             ) : (
               myOrders.map(order => (
-                <div key={order.id} className={`bg-white rounded-2xl p-6 border flex flex-col md:flex-row justify-between md:items-center gap-4 transition-all ${order.status === 'rejected' ? 'border-red-200' : 'border-gray-100'}`}>
+                <div key={order.id} className={`bg-white rounded-2xl p-6 border flex flex-col md:flex-row justify-between md:items-center gap-4 transition-all ${order.status.includes('cancelled') || order.status === 'rejected' ? 'border-red-200' : 'border-gray-100'}`}>
                   <div className="flex-1">
                     <div className="flex items-center gap-3 mb-1">
                       <h4 className="font-bold text-xl">{order.itemName}</h4>
-                      <span className={`text-[10px] uppercase font-bold px-3 py-1 rounded-full ${order.status === 'rejected' ? 'bg-red-500 text-white' : order.status === 'delivered' ? 'bg-green-500 text-white' : 'bg-brand-gold/10 text-brand-gold'}`}>
-                        {order.status}
+                      <span className={`text-[10px] uppercase font-bold px-3 py-1 rounded-full ${order.status.includes('cancelled') || order.status === 'rejected' ? 'bg-red-500 text-white' : order.status === 'delivered' ? 'bg-green-500 text-white' : 'bg-brand-gold/10 text-brand-gold'}`}>
+                        {order.status.replace(/_/g, ' ')}
                       </span>
                     </div>
                     <div className="flex items-center gap-4 text-xs text-gray-500 font-sans">
                        <span className="flex items-center gap-1"><Clock size={12}/> {new Date(order.createdAt).toLocaleDateString()}</span>
-                       <span className="flex items-center gap-1 uppercase tracking-tighter">{order.orderType.replace('_', ' ')}</span>
+                       <span className="flex items-center gap-1 uppercase tracking-tighter">{order.orderType.replace(/_/g, ' ')}</span>
                     </div>
-                    {order.status === 'rejected' && order.rejectReason && (
+                    
+                    {(order.status === 'rejected' || order.status.includes('cancelled')) && (order.rejectReason || order.cancelReason) && (
                       <div className="mt-4 p-4 bg-red-50 border border-red-100 rounded-xl flex items-start gap-3">
                          <Ban size={16} className="text-red-500 mt-0.5 shrink-0" />
                          <div>
-                            <p className="text-[10px] text-red-500 uppercase font-bold tracking-widest mb-1">Order Rejected</p>
-                            <p className="text-xs text-red-700 font-medium italic">"{order.rejectReason}"</p>
+                            <p className="text-[10px] text-red-500 uppercase font-bold tracking-widest mb-1">
+                              {order.status === 'rejected' ? 'Order Rejected' : `Order Cancelled by ${order.cancelledBy === 'admin' ? 'Restaurant' : 'You'}`}
+                            </p>
+                            <p className="text-xs text-red-700 font-medium italic">"{order.rejectReason || order.cancelReason}"</p>
                          </div>
                       </div>
+                    )}
+
+                    {(order.status === 'pending' || order.status === 'accepted') && (
+                      <button 
+                        onClick={() => setCancellingOrder(order.id!)}
+                        className="mt-4 flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-red-500 hover:text-red-700 transition-colors"
+                      >
+                        <XCircle size={14} /> Cancel Order
+                      </button>
                     )}
                   </div>
                   <div className="text-right shrink-0">
                     <p className="text-2xl font-display font-bold">₹{order.orderAmount}</p>
-                    {order.status !== 'rejected' && <p className="text-xs text-brand-gold">+{order.pointsEarned} Points</p>}
-                    {order.status === 'rejected' && <p className="text-[10px] text-red-400 font-bold uppercase tracking-widest">Cancelled</p>}
+                    {order.status === 'delivered' && <p className="text-xs text-brand-gold">+{order.pointsEarned} Points</p>}
+                    {(order.status === 'rejected' || order.status.includes('cancelled')) && <p className="text-[10px] text-red-400 font-bold uppercase tracking-widest">Cancelled</p>}
                   </div>
                 </div>
               ))
@@ -311,6 +354,38 @@ const Dashboard: React.FC<DashboardProps> = ({ user, points, onBack, adminMode, 
           </div>
         )}
       </div>
+
+      {/* User Cancellation Modal */}
+      {cancellingOrder && (
+        <div className="fixed inset-0 z-[110] bg-black/80 backdrop-blur-md flex items-center justify-center p-4 animate-fade-in">
+          <div className="bg-white rounded-3xl p-8 w-full max-w-md shadow-2xl animate-fade-in-up border border-red-100">
+            <div className="flex items-center gap-4 mb-8 text-red-500">
+              <div className="w-12 h-12 bg-red-50 rounded-xl flex items-center justify-center border border-red-100"><XCircle size={24} /></div>
+              <h3 className="text-2xl font-display font-bold uppercase tracking-widest">Cancel Order</h3>
+            </div>
+            <div className="space-y-6">
+              <div>
+                <label className="text-[10px] text-gray-500 uppercase font-bold tracking-widest mb-3 block">Reason for Cancellation</label>
+                <select className="w-full bg-gray-50 border border-gray-200 rounded-xl p-4 text-brand-dark focus:border-red-500 outline-none transition-all" value={cancelReason} onChange={(e) => setCancelReason(e.target.value)}>
+                  <option value="">Select a reason...</option>
+                  <option value="Ordered by mistake">Ordered by mistake</option>
+                  <option value="Changed my mind">Changed my mind</option>
+                  <option value="Delivery delay">Delivery delay</option>
+                  <option value="Operational Issues">Operational Issues</option>
+                  <option value="Other">Other reason...</option>
+                </select>
+              </div>
+              {cancelReason === 'Other' && (
+                <textarea placeholder="Tell us more..." className="w-full bg-gray-50 border border-gray-200 rounded-xl p-4 text-brand-dark focus:border-red-500 outline-none transition-all h-24 resize-none" value={customCancelReason} onChange={(e) => setCustomCancelReason(e.target.value)} />
+              )}
+              <div className="flex gap-3 pt-4">
+                <button onClick={handleCancelOrderByUser} className="flex-1 py-4 bg-red-500 text-white rounded-xl text-xs font-bold uppercase tracking-widest hover:bg-red-600 transition-all shadow-lg active:scale-95">Cancel Order</button>
+                <button onClick={() => { setCancellingOrder(null); setCancelReason(''); setCustomCancelReason(''); }} className="px-8 py-4 bg-gray-100 text-gray-500 rounded-xl text-xs font-bold uppercase tracking-widest hover:bg-gray-200 transition-all">Keep Order</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

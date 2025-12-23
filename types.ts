@@ -15,7 +15,7 @@ export interface CategoryConfig {
   image: string;
 }
 
-export type OrderStatus = 'pending' | 'accepted' | 'preparing' | 'out_for_delivery' | 'delivered' | 'cancelled';
+export type OrderStatus = 'pending' | 'accepted' | 'preparing' | 'out_for_delivery' | 'delivered' | 'rejected' | 'cancelled_by_user' | 'cancelled_by_admin';
 export type OrderType = 'delivery' | 'table_booking' | 'cabin_booking';
 
 export interface Order {
@@ -33,7 +33,11 @@ export interface Order {
   pointsCredited: boolean;
   createdAt: string;
   deliveredAt?: string;
+  updatedAt?: string;
   notes?: string;
+  rejectReason?: string;
+  cancelReason?: string;
+  cancelledBy?: 'user' | 'admin';
 }
 
 export interface UserProfile {

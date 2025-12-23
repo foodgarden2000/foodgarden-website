@@ -41,10 +41,10 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
   const [customStartDate, setCustomStartDate] = useState('');
   const [customEndDate, setCustomEndDate] = useState('');
 
-  // Rejection Modal State
-  const [rejectingOrder, setRejectingOrder] = useState<string | null>(null);
-  const [rejectReason, setRejectReason] = useState('');
-  const [customRejectReason, setCustomRejectReason] = useState('');
+  // Rejection/Cancellation Modal State
+  const [actioningOrder, setActioningOrder] = useState<{id: string, action: 'reject' | 'cancel'} | null>(null);
+  const [actionReason, setActionReason] = useState('');
+  const [customActionReason, setCustomActionReason] = useState('');
 
   // Sound Notification States
   const [isSoundEnabled, setIsSoundEnabled] = useState(false);
@@ -154,6 +154,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
         total: typeFiltered.length,
         accepted: typeFiltered.filter(o => o.status === 'accepted').length,
         rejected: typeFiltered.filter(o => o.status === 'rejected').length,
+        cancelled: typeFiltered.filter(o => o.status === 'cancelled_by_user' || o.status === 'cancelled_by_admin').length,
         completed: typeFiltered.filter(o => o.status === 'delivered').length,
         revenue: typeFiltered.reduce((acc, o) => acc + (o.status === 'delivered' ? (o.orderAmount || 0) : 0), 0)
       };
@@ -185,7 +186,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
       const orderRef = doc(db, "orders", orderId);
       await updateDoc(orderRef, {
         status: newStatus,
-        deliveredAt: newStatus === 'delivered' ? new Date().toISOString() : null
+        deliveredAt: newStatus === 'delivered' ? new Date().toISOString() : null,
+        updatedAt: new Date().toISOString()
       });
 
       const orderSnap = await getDoc(orderRef);
@@ -202,27 +204,38 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
     }
   };
 
-  const handleRejectOrder = async () => {
-    if (!rejectingOrder) return;
-    const reason = rejectReason === 'Other' ? customRejectReason : rejectReason;
+  const handleOrderAction = async () => {
+    if (!actioningOrder) return;
+    const reason = actionReason === 'Other' ? customActionReason : actionReason;
     if (!reason) {
-      alert("Please provide a reason for rejection.");
+      alert("Please provide a reason.");
       return;
     }
 
     try {
-      const orderRef = doc(db, "orders", rejectingOrder);
-      await updateDoc(orderRef, {
-        status: 'rejected',
-        rejectReason: reason,
+      console.log(`${actioningOrder.action.toUpperCase()}ING: Order ${actioningOrder.id} for reason: ${reason}`);
+      const orderRef = doc(db, "orders", actioningOrder.id);
+      
+      const updateData: any = {
+        status: actioningOrder.action === 'reject' ? 'rejected' : 'cancelled_by_admin',
         updatedAt: new Date().toISOString()
-      });
-      setRejectingOrder(null);
-      setRejectReason('');
-      setCustomRejectReason('');
+      };
+
+      if (actioningOrder.action === 'reject') {
+        updateData.rejectReason = reason;
+      } else {
+        updateData.cancelReason = reason;
+        updateData.cancelledBy = 'admin';
+      }
+
+      await updateDoc(orderRef, updateData);
+      alert(`Order ${actioningOrder.action === 'reject' ? 'rejected' : 'cancelled'} successfully.`);
+      setActioningOrder(null);
+      setActionReason('');
+      setCustomActionReason('');
     } catch (err) {
-      console.error("Rejection error:", err);
-      alert("Failed to reject order.");
+      console.error("Action error:", err);
+      alert("Failed to process action.");
     }
   };
 
@@ -447,22 +460,26 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
                 </div>
 
                 {/* Stat Cards for Active Category */}
-                <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 animate-fade-in-up">
+                <div className="grid grid-cols-2 lg:grid-cols-5 gap-4 animate-fade-in-up">
                   <div className="bg-brand-dark/30 border border-brand-gold/20 p-8 rounded-2xl text-center shadow-xl hover:bg-brand-gold/5 transition-colors">
-                    <p className="text-[10px] text-gray-500 uppercase font-bold tracking-widest mb-2">Total {activeOrderCategory === 'delivery' ? 'Orders' : 'Bookings'}</p>
-                    <p className="text-4xl font-bold text-white">{activeStats.total}</p>
+                    <p className="text-[10px] text-gray-500 uppercase font-bold tracking-widest mb-2">Total</p>
+                    <p className="text-3xl font-bold text-white">{activeStats.total}</p>
                   </div>
                   <div className="bg-brand-dark/30 border border-blue-500/20 p-8 rounded-2xl text-center shadow-xl hover:bg-blue-500/5 transition-colors">
                     <p className="text-[10px] text-gray-500 uppercase font-bold tracking-widest mb-2">Accepted</p>
-                    <p className="text-4xl font-bold text-blue-400">{activeStats.accepted}</p>
+                    <p className="text-3xl font-bold text-blue-400">{activeStats.accepted}</p>
                   </div>
                   <div className="bg-brand-dark/30 border border-red-500/20 p-8 rounded-2xl text-center shadow-xl hover:bg-red-500/5 transition-colors">
                     <p className="text-[10px] text-gray-500 uppercase font-bold tracking-widest mb-2">Rejected</p>
-                    <p className="text-4xl font-bold text-red-400">{activeStats.rejected}</p>
+                    <p className="text-3xl font-bold text-red-400">{activeStats.rejected}</p>
+                  </div>
+                  <div className="bg-brand-dark/30 border border-red-800/20 p-8 rounded-2xl text-center shadow-xl hover:bg-red-800/5 transition-colors">
+                    <p className="text-[10px] text-gray-500 uppercase font-bold tracking-widest mb-2">Cancelled</p>
+                    <p className="text-3xl font-bold text-red-600">{activeStats.cancelled}</p>
                   </div>
                   <div className="bg-brand-dark/30 border border-green-500/20 p-8 rounded-2xl text-center shadow-xl hover:bg-green-500/5 transition-colors">
-                    <p className="text-[10px] text-gray-500 uppercase font-bold tracking-widest mb-2">{activeOrderCategory === 'delivery' ? 'Delivered' : 'Completed'}</p>
-                    <p className="text-4xl font-bold text-green-400">{activeStats.completed}</p>
+                    <p className="text-[10px] text-gray-500 uppercase font-bold tracking-widest mb-2">Done</p>
+                    <p className="text-3xl font-bold text-green-400">{activeStats.completed}</p>
                   </div>
                 </div>
 
@@ -491,7 +508,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
                     .filter(o => o.orderType === activeOrderCategory)
                     .map(order => {
                       const action = getStatusAction(order.status);
-                      const statusLabel = (order.status || 'pending').replace('_', ' ');
+                      const statusLabel = (order.status || 'pending').replace(/_/g, ' ');
                       
                       return (
                         <div key={order.id} className={`bg-brand-dark/50 backdrop-blur-xl border rounded-3xl p-8 transition-all group ${order.status === 'pending' ? 'border-brand-gold shadow-[0_0_20px_rgba(212,175,55,0.05)]' : 'border-gray-800'}`}>
@@ -503,8 +520,12 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
                               <div>
                                 <div className="flex flex-wrap items-center gap-3 mb-2">
                                   <h4 className="text-white font-bold text-2xl">{order.itemName || 'Untitled Item'} {order.orderType === 'delivery' && <span className="text-brand-gold text-lg ml-2">x {order.quantity || 1}</span>}</h4>
+                                  
                                   {order.status === 'rejected' && (
                                     <span className="text-[10px] bg-red-500/10 text-red-500 px-3 py-1 rounded-full uppercase font-bold tracking-widest flex items-center gap-1"><Ban size={10} /> Rejected</span>
+                                  )}
+                                  {(order.status === 'cancelled_by_user' || order.status === 'cancelled_by_admin') && (
+                                    <span className="text-[10px] bg-red-800/10 text-red-600 px-3 py-1 rounded-full uppercase font-bold tracking-widest flex items-center gap-1"><Ban size={10} /> {order.status === 'cancelled_by_user' ? 'Cancelled by User' : 'Cancelled by Admin'}</span>
                                   )}
                                   {order.status === 'delivered' && (
                                     <span className="text-[10px] bg-green-500/10 text-green-500 px-3 py-1 rounded-full uppercase font-bold tracking-widest flex items-center gap-1"><CheckCircle2 size={10} /> {order.orderType === 'delivery' ? 'Delivered' : 'Completed'}</span>
@@ -515,15 +536,15 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
                                 </p>
                                 <div className="mt-5 flex flex-wrap items-center gap-4 text-[10px] font-bold uppercase tracking-widest">
                                   <div className="bg-gray-900 text-gray-400 px-4 py-1.5 rounded-full border border-white/5 flex items-center gap-2">
-                                    <Clock size={12} /> Status: <span className="text-white">{statusLabel}</span>
+                                    <Clock size={12} /> Status: <span className={`text-white uppercase ${order.status.includes('cancelled') || order.status === 'rejected' ? 'text-red-500' : ''}`}>{statusLabel}</span>
                                   </div>
                                   <div className="bg-gray-900 text-gray-400 px-4 py-1.5 rounded-full border border-white/5 flex items-center gap-2">
                                     <CalendarDays size={12} /> {new Date(order.createdAt).toLocaleString()}
                                   </div>
                                 </div>
-                                {order.rejectReason && (
+                                {(order.rejectReason || order.cancelReason) && (
                                   <p className="mt-4 p-4 bg-red-500/5 rounded-2xl border border-red-500/10 text-red-400 text-xs italic">
-                                    Rejection Reason: {order.rejectReason}
+                                    {order.rejectReason ? `Rejection Reason: ${order.rejectReason}` : `Cancellation Reason (${order.cancelledBy}): ${order.cancelReason}`}
                                   </p>
                                 )}
                               </div>
@@ -544,13 +565,18 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
                                 )}
                               </div>
                               <div className="flex gap-2 w-full md:w-auto">
-                                {order.status === 'pending' && (
+                                {(order.status === 'pending' || order.status === 'accepted') && (
                                   <>
-                                    <button onClick={() => handleUpdateOrderStatus(order.id, 'accepted')} className="flex-1 md:flex-none flex items-center justify-center gap-2 px-6 py-3 bg-blue-500 text-white rounded-xl text-[10px] font-bold uppercase tracking-widest hover:brightness-110 active:scale-95 transition-all shadow-lg"><Check size={16} /> Accept</button>
-                                    <button onClick={() => setRejectingOrder(order.id)} className="flex-1 md:flex-none flex items-center justify-center gap-2 px-6 py-3 bg-red-500 text-white rounded-xl text-[10px] font-bold uppercase tracking-widest hover:brightness-110 active:scale-95 transition-all shadow-lg"><Ban size={16} /> Reject</button>
+                                    {action && (
+                                      <button onClick={() => handleUpdateOrderStatus(order.id, action.next as OrderStatus)} className={`flex-1 md:flex-none flex items-center justify-center gap-2 px-6 py-3 ${action.color} text-white rounded-xl text-[10px] font-bold uppercase tracking-widest hover:brightness-110 active:scale-95 transition-all shadow-lg`}><action.icon size={16} /> {action.label}</button>
+                                    )}
+                                    {order.status === 'pending' && (
+                                      <button onClick={() => setActioningOrder({id: order.id, action: 'reject'})} className="flex-1 md:flex-none flex items-center justify-center gap-2 px-6 py-3 bg-red-600 text-white rounded-xl text-[10px] font-bold uppercase tracking-widest hover:brightness-110 active:scale-95 transition-all shadow-lg"><Ban size={16} /> Reject</button>
+                                    )}
+                                    <button onClick={() => setActioningOrder({id: order.id, action: 'cancel'})} className="flex-1 md:flex-none flex items-center justify-center gap-2 px-6 py-3 border border-red-800 text-red-600 rounded-xl text-[10px] font-bold uppercase tracking-widest hover:bg-red-600 hover:text-white active:scale-95 transition-all shadow-lg"><XCircle size={16} /> Cancel</button>
                                   </>
                                 )}
-                                {order.status !== 'pending' && order.status !== 'rejected' && order.status !== 'delivered' && action && (
+                                {order.status === 'preparing' || order.status === 'out_for_delivery' && action && (
                                    <button onClick={() => handleUpdateOrderStatus(order.id, action.next as OrderStatus)} className={`flex-1 md:flex-none flex items-center justify-center gap-2 px-6 py-3 ${action.color} text-white rounded-xl text-[10px] font-bold uppercase tracking-widest hover:brightness-110 active:scale-95 transition-all shadow-lg`}><action.icon size={16} /> {action.label}</button>
                                 )}
                                 <button onClick={() => deleteItem('orders', order.id)} className="px-4 py-3 text-gray-700 hover:text-red-500 bg-gray-900 rounded-xl border border-white/5 transition-colors"><Trash2 size={16}/></button>
@@ -580,32 +606,35 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
         </div>
       </div>
 
-      {/* Reject Reason Modal */}
-      {rejectingOrder && (
+      {/* Action (Reject/Cancel) Modal */}
+      {actioningOrder && (
         <div className="fixed inset-0 z-[110] bg-black/80 backdrop-blur-md flex items-center justify-center p-4 animate-fade-in">
           <div className="bg-brand-dark border border-brand-red/30 rounded-3xl p-8 w-full max-w-md shadow-2xl animate-fade-in-up">
             <div className="flex items-center gap-4 mb-8">
-              <div className="w-12 h-12 bg-red-500/10 rounded-xl flex items-center justify-center text-red-500 border border-red-500/20"><Ban size={24} /></div>
-              <h3 className="text-2xl font-display font-bold text-white uppercase tracking-widest">Reject {activeOrderCategory === 'delivery' ? 'Order' : 'Booking'}</h3>
+              <div className={`w-12 h-12 ${actioningOrder.action === 'reject' ? 'bg-red-500/10 text-red-500 border-red-500/20' : 'bg-red-800/10 text-red-600 border-red-800/20'} rounded-xl flex items-center justify-center border`}><Ban size={24} /></div>
+              <h3 className="text-2xl font-display font-bold text-white uppercase tracking-widest">
+                {actioningOrder.action === 'reject' ? 'Reject' : 'Cancel'} {activeOrderCategory === 'delivery' ? 'Order' : 'Booking'}
+              </h3>
             </div>
             <div className="space-y-6">
               <div>
                 <label className="text-[10px] text-gray-500 uppercase font-bold tracking-widest mb-3 block">Select Reason</label>
-                <select className="w-full bg-black/40 border border-gray-800 rounded-xl p-4 text-white focus:border-brand-red outline-none transition-all" value={rejectReason} onChange={(e) => setRejectReason(e.target.value)}>
+                <select className="w-full bg-black/40 border border-gray-800 rounded-xl p-4 text-white focus:border-brand-red outline-none transition-all" value={actionReason} onChange={(e) => setActionReason(e.target.value)}>
                   <option value="">Choose a reason...</option>
                   <option value="Item unavailable">Item unavailable</option>
                   <option value="Kitchen busy">Kitchen busy</option>
-                  <option value="Shop closed">Shop closed / Fully Booked</option>
+                  <option value="Shop closed / Fully Booked">Shop closed / Fully Booked</option>
                   <option value="Delivery not available">Delivery not available</option>
+                  <option value="Operational Issues">Operational Issues</option>
                   <option value="Other">Custom Reason...</option>
                 </select>
               </div>
-              {rejectReason === 'Other' && (
-                <textarea placeholder="Enter custom reason..." className="w-full bg-black/40 border border-gray-800 rounded-xl p-4 text-white focus:border-brand-red outline-none transition-all h-24 resize-none" value={customRejectReason} onChange={(e) => setCustomRejectReason(e.target.value)} />
+              {actionReason === 'Other' && (
+                <textarea placeholder="Enter custom reason..." className="w-full bg-black/40 border border-gray-800 rounded-xl p-4 text-white focus:border-brand-red outline-none transition-all h-24 resize-none" value={customActionReason} onChange={(e) => setCustomActionReason(e.target.value)} />
               )}
               <div className="flex gap-3 pt-4">
-                <button onClick={handleRejectOrder} className="flex-1 py-4 bg-red-500 text-white rounded-xl text-xs font-bold uppercase tracking-widest hover:bg-red-600 transition-all shadow-lg">Confirm Reject</button>
-                <button onClick={() => { setRejectingOrder(null); setRejectReason(''); setCustomRejectReason(''); }} className="px-8 py-4 bg-gray-800 text-gray-400 rounded-xl text-xs font-bold uppercase tracking-widest hover:bg-gray-700 transition-all">Cancel</button>
+                <button onClick={handleOrderAction} className="flex-1 py-4 bg-red-600 text-white rounded-xl text-xs font-bold uppercase tracking-widest hover:bg-red-700 transition-all shadow-lg">Confirm Action</button>
+                <button onClick={() => { setActioningOrder(null); setActionReason(''); setCustomActionReason(''); }} className="px-8 py-4 bg-gray-800 text-gray-400 rounded-xl text-xs font-bold uppercase tracking-widest hover:bg-gray-700 transition-all">Cancel</button>
               </div>
             </div>
           </div>
