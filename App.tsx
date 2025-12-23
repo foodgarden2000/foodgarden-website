@@ -12,6 +12,7 @@ import ContactFooter from './components/ContactFooter';
 import FloatingButtons from './components/FloatingButtons';
 import Dashboard from './components/Dashboard';
 import AdminDashboard from './components/AdminDashboard';
+import BookOnlineModal from './components/BookOnlineModal';
 import { CONTACT_SHEET_URL, RESTAURANT_INFO } from './constants';
 import { ContactInfo } from './types';
 import { auth, db } from './firebase';
@@ -26,6 +27,7 @@ const App: React.FC = () => {
   const [authLoading, setAuthLoading] = useState(true);
   const [currentView, setCurrentView] = useState<ViewState>('home');
   const [capturedReferralCode, setCapturedReferralCode] = useState<string | null>(null);
+  const [isBookOnlineOpen, setIsBookOnlineOpen] = useState(false);
   const [contactInfo, setContactInfo] = useState<ContactInfo>({
     phone: RESTAURANT_INFO.phone,
     whatsapp: RESTAURANT_INFO.whatsapp,
@@ -39,7 +41,6 @@ const App: React.FC = () => {
   const isAdmin = user?.email === 'admin@chefsjalsa.com';
 
   useEffect(() => {
-    // Capture referral code from URL immediately on page load
     const params = new URLSearchParams(window.location.search);
     const ref = params.get('ref');
     if (ref) {
@@ -54,7 +55,6 @@ const App: React.FC = () => {
       if (currentUser?.email === 'admin@chefsjalsa.com') {
         setCurrentView('admin');
       } else if (!currentUser && currentView === 'admin') {
-        // Force reset to home view only if staff was logged in
         setCurrentView('home');
       }
     });
@@ -144,7 +144,7 @@ const App: React.FC = () => {
       <main className="flex-grow">
         {currentView === 'home' && (
           <>
-            <Hero contactInfo={contactInfo} />
+            <Hero contactInfo={contactInfo} onBookOnline={() => setIsBookOnlineOpen(true)} />
             <About />
             <FestiveSpecials whatsappNumber={contactInfo.whatsapp} />
             <Menu 
@@ -177,6 +177,14 @@ const App: React.FC = () => {
 
       <ContactFooter contactInfo={contactInfo} onAdminLogin={() => navigateTo('admin')} />
       <FloatingButtons phone={contactInfo.phone} whatsappNumber={contactInfo.whatsapp} />
+      
+      <BookOnlineModal 
+        isOpen={isBookOnlineOpen} 
+        onClose={() => setIsBookOnlineOpen(false)} 
+        user={user} 
+        onNavigate={navigateTo}
+        whatsappNumber={contactInfo.whatsapp}
+      />
     </div>
   );
 };

@@ -4,7 +4,7 @@ import { User as FirebaseUser, signOut } from "https://www.gstatic.com/firebasej
 import { auth, db } from '../firebase';
 import Auth from './Auth';
 import { 
-  ArrowLeft, Award, LogOut, User, ShoppingBag, Clock, Share2, Copy, Check, Gift, Truck, Coffee, Sofa, AlertCircle, Loader2, Smartphone, ShieldCheck, Zap, CreditCard, ExternalLink, ArrowRight, Ban, XCircle, Search, Tag, Coins
+  ArrowLeft, Award, LogOut, User, ShoppingBag, Clock, Share2, Copy, Check, Gift, Truck, Coffee, Sofa, AlertCircle, Loader2, Smartphone, ShieldCheck, Zap, CreditCard, ExternalLink, ArrowRight, Ban, XCircle, Search, Tag, Coins, CalendarCheck, MapPin
 } from 'lucide-react';
 import { 
   doc, 
@@ -18,7 +18,7 @@ import {
   documentId,
   getDoc
 } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
-import { UserProfile, Order, OrderStatus, SubscriptionRequest } from '../types';
+import { UserProfile, Order, OrderStatus, SubscriptionRequest, EventBooking } from '../types';
 
 interface DashboardProps {
   user: FirebaseUser | null;
@@ -30,11 +30,13 @@ interface DashboardProps {
 }
 
 type SubStep = 'IDLE' | 'PAYING' | 'CONFIRMING' | 'VERIFYING';
+type DashboardTab = 'profile' | 'orders' | 'bookings' | 'subscription';
 
 const Dashboard: React.FC<DashboardProps> = ({ user, points, onBack, adminMode, adminOnlyRequest, referralCodeFromUrl }) => {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [myOrders, setMyOrders] = useState<Order[]>([]);
-  const [activeTab, setActiveTab] = useState<'profile' | 'orders' | 'subscription'>('orders');
+  const [myBookings, setMyBookings] = useState<EventBooking[]>([]);
+  const [activeTab, setActiveTab] = useState<DashboardTab>('orders');
   const [copied, setCopied] = useState(false);
   const [loadingProfile, setLoadingProfile] = useState(true);
   const [orderError, setOrderError] = useState<string | null>(null);
@@ -80,6 +82,13 @@ const Dashboard: React.FC<DashboardProps> = ({ user, points, onBack, adminMode, 
       setOrderError("Unable to sync your orders.");
     });
 
+    const qBookings = query(collection(db, "eventBookings"), where("userId", "==", user.uid));
+    const unsubBookings = onSnapshot(qBookings, (snapshot) => {
+      const bookings = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as EventBooking));
+      bookings.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+      setMyBookings(bookings);
+    });
+
     const qSub = query(
       collection(db, "subscription"), 
       where("userId", "==", user.uid),
@@ -97,7 +106,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, points, onBack, adminMode, 
       }
     });
 
-    return () => { unsubProfile(); unsubOrders(); unsubSub(); };
+    return () => { unsubProfile(); unsubOrders(); unsubBookings(); unsubSub(); };
   }, [user]);
 
   const handleCancelOrder = async () => {
@@ -123,6 +132,21 @@ const Dashboard: React.FC<DashboardProps> = ({ user, points, onBack, adminMode, 
     } catch (err) {
       console.error("Cancellation error:", err);
       alert("Failed to cancel order. Please try again.");
+    }
+  };
+
+  const handleCancelBooking = async (bookingId: string) => {
+    if (!window.confirm("Are you sure you want to cancel this booking?")) return;
+    try {
+      await updateDoc(doc(db, "eventBookings", bookingId), {
+        status: 'cancelled_by_user',
+        updatedAt: new Date().toISOString()
+      });
+      console.log("Booking status updated: cancelled_by_user");
+      alert("Booking cancelled.");
+    } catch (err) {
+      console.error(err);
+      alert("Failed to cancel booking.");
     }
   };
 
@@ -175,7 +199,6 @@ const Dashboard: React.FC<DashboardProps> = ({ user, points, onBack, adminMode, 
     <div className="pt-32 pb-24 min-h-screen bg-brand-cream relative overflow-hidden">
       <div className="container mx-auto px-4 md:px-8 relative z-10">
         
-        {/* Header Section */}
         <div className="flex flex-col md:flex-row items-center justify-between mb-12 gap-6">
           <div className="flex items-center gap-6">
             <div className="w-16 h-16 bg-brand-dark rounded-full flex items-center justify-center text-brand-gold border-2 border-brand-gold shadow-xl">
@@ -199,6 +222,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, points, onBack, adminMode, 
           <div className="flex bg-white p-1 rounded-xl shadow-sm border border-gray-100 overflow-x-auto max-w-full">
             <button onClick={() => setActiveTab('profile')} className={`px-6 py-2 rounded-lg text-xs font-bold uppercase tracking-widest whitespace-nowrap ${activeTab === 'profile' ? 'bg-brand-dark text-white' : 'text-gray-400'}`}>Profile</button>
             <button onClick={() => setActiveTab('orders')} className={`px-6 py-2 rounded-lg text-xs font-bold uppercase tracking-widest whitespace-nowrap ${activeTab === 'orders' ? 'bg-brand-dark text-white' : 'text-gray-400'}`}>Orders</button>
+            <button onClick={() => setActiveTab('bookings')} className={`px-6 py-2 rounded-lg text-xs font-bold uppercase tracking-widest whitespace-nowrap ${activeTab === 'bookings' ? 'bg-brand-dark text-white' : 'text-gray-400'}`}>Bookings</button>
             {profile?.role !== 'subscriber' && (
               <button onClick={() => setActiveTab('subscription')} className={`px-6 py-2 rounded-lg text-xs font-bold uppercase tracking-widest flex items-center gap-2 whitespace-nowrap ${activeTab === 'subscription' ? 'bg-brand-red text-white' : 'text-brand-red'}`}>
                 <Zap size={12} /> Subscribe
@@ -208,7 +232,6 @@ const Dashboard: React.FC<DashboardProps> = ({ user, points, onBack, adminMode, 
           </div>
         </div>
 
-        {/* Content Tabs */}
         {activeTab === 'profile' && (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
             <div className="bg-brand-dark p-8 rounded-2xl border border-brand-gold/30 shadow-2xl flex flex-col items-center text-center group">
@@ -358,9 +381,56 @@ const Dashboard: React.FC<DashboardProps> = ({ user, points, onBack, adminMode, 
             )}
           </div>
         )}
+
+        {activeTab === 'bookings' && (
+          <div className="space-y-8">
+            {myBookings.length === 0 ? (
+              <div className="text-center py-24 bg-white rounded-3xl shadow-sm border border-gray-100 animate-fade-in">
+                <CalendarCheck size={48} className="text-gray-200 mx-auto mb-4" />
+                <h3 className="text-xl font-serif text-gray-500">No event bookings found</h3>
+              </div>
+            ) : (
+              myBookings.map(booking => (
+                <div key={booking.id} className="bg-white rounded-2xl p-6 border border-gray-100 hover:shadow-lg transition-all animate-fade-in-up">
+                  <div className="flex flex-col md:flex-row justify-between gap-6">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-3 mb-3">
+                         <span className="p-2 bg-brand-gold/10 text-brand-gold rounded-lg"><CalendarCheck size={20} /></span>
+                         <h4 className="font-bold text-xl text-brand-black uppercase tracking-widest">{booking.bookingType} Party</h4>
+                         <span className={`text-[10px] uppercase font-bold px-3 py-1 rounded-full ${booking.status === 'accepted' ? 'bg-green-500 text-white' : booking.status === 'rejected' || booking.status === 'cancelled_by_user' ? 'bg-red-500 text-white' : 'bg-brand-gold/10 text-brand-gold border border-brand-gold/20'}`}>
+                           {booking.status.replace(/_/g, ' ')}
+                         </span>
+                      </div>
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-[10px] text-gray-500 font-bold uppercase tracking-widest">
+                         <div className="flex items-center gap-1.5"><Clock size={12} className="text-brand-gold" /> {booking.date} at {booking.time}</div>
+                         <div className="flex items-center gap-1.5"><User size={12} className="text-brand-gold" /> {booking.peopleCount} People</div>
+                         {booking.specialNote && <div className="flex items-center gap-1.5 col-span-2"><MapPin size={12} className="text-brand-gold" /> {booking.specialNote.substring(0, 30)}...</div>}
+                      </div>
+
+                      {booking.adminReason && (
+                        <div className="mt-4 p-4 bg-red-50 border border-red-100 rounded-xl text-xs text-red-700 italic">
+                          " {booking.adminReason} "
+                        </div>
+                      )}
+
+                      {booking.status === 'pending' && (
+                        <button 
+                          onClick={() => handleCancelBooking(booking.id!)}
+                          className="mt-5 text-[10px] font-bold uppercase tracking-widest text-red-500 hover:underline"
+                        >
+                          Cancel Booking
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        )}
       </div>
 
-      {/* Cancellation Modal */}
+      {/* Cancellation Modal for Orders */}
       {cancellingOrder && (
         <div className="fixed inset-0 z-[110] bg-black/80 backdrop-blur-md flex items-center justify-center p-4 animate-fade-in">
           <div className="bg-white rounded-3xl p-8 w-full max-w-md shadow-2xl animate-fade-in-up border border-red-100">

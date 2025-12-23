@@ -16,15 +16,15 @@ export interface CategoryConfig {
 }
 
 export type OrderStatus = 'pending' | 'accepted' | 'preparing' | 'out_for_delivery' | 'delivered' | 'rejected' | 'cancelled_by_user' | 'cancelled_by_admin';
-export type OrderType = 'delivery' | 'table_booking' | 'cabin_booking';
-export type UserCategory = 'normal' | 'registered' | 'subscriber';
+export type OrderType = 'delivery' | 'table_booking' | 'cabin_booking' | 'kitty_party' | 'birthday_party' | 'club_meeting';
 export type PaymentMode = 'upi' | 'cash' | 'points';
+export type UserCategory = 'normal' | 'registered' | 'subscriber';
 
 export interface Order {
   id?: string;
   userId: string | null;
   userType: UserCategory;
-  guestCancelToken?: string; // Secure token for guest cancellations
+  guestCancelToken?: string;
   userName: string;
   userPhone: string;
   address: string;
@@ -46,6 +46,22 @@ export interface Order {
   rejectReason?: string;
   cancelReason?: string;
   cancelledBy?: 'user' | 'admin';
+}
+
+export interface EventBooking {
+  id?: string;
+  bookingType: 'kitty' | 'birthday' | 'club';
+  userId: string;
+  userName: string;
+  phone: string;
+  date: string;
+  time: string;
+  peopleCount: number;
+  specialNote: string;
+  status: 'pending' | 'accepted' | 'rejected' | 'cancelled_by_user';
+  adminReason?: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface UserProfile {
