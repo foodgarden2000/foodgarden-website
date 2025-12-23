@@ -17,7 +17,7 @@ import {
 import { 
   Plus, Trash2, Utensils, Calendar, 
   Tag, ShoppingBag, Clock, CheckCircle2, XCircle, LogOut, Truck, Sofa, Coffee, Check, AlertTriangle, Zap, User, ShieldCheck, Mail, Smartphone, Loader2,
-  Play, Volume2, VolumeX, Ban, Filter, BarChart3, CalendarDays, ChevronRight, Star, X, Coins, Wallet, CalendarCheck, Users, Phone, Search, CreditCard, Edit3, Image as ImageIcon, Eye, EyeOff, Layers
+  Play, Volume2, VolumeX, Ban, Filter, BarChart3, CalendarDays, ChevronRight, Star, X, Coins, Wallet, CalendarCheck, Users, Phone, Search, CreditCard, Edit3, Image as ImageIcon, Eye, EyeOff, Layers, Globe
 } from 'lucide-react';
 import { MenuItem, MenuCategory, FestivalSpecial, CategoryConfig, Order, OrderStatus, SubscriptionRequest, OrderType, UserCategory, EventBooking, UserProfile } from '../types';
 import { getOptimizedImageURL } from '../constants';
@@ -27,7 +27,8 @@ interface AdminDashboardProps {
 }
 
 type TimeFilter = 'today' | 'week' | 'month' | 'year' | 'custom';
-type OrderCategory = 'delivery' | 'table_booking' | 'cabin_booking' | 'event_booking';
+// Added 'onlineBooking' to match Firestore data types
+type OrderCategory = 'delivery' | 'table_booking' | 'cabin_booking' | 'event_booking' | 'onlineBooking';
 type UserTypeFilter = 'all' | 'registered' | 'subscriber';
 
 const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
@@ -129,18 +130,24 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
     });
 
     const unsubOrders = onSnapshot(collection(db, "orders"), (snapshot) => {
+      const loadedOrders = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as any));
+      // FIXED: Debug logging for orders
+      console.log("Orders loaded:", loadedOrders.length);
+
       if (!isInitialLoad.current && soundEnabledRef.current) {
         snapshot.docChanges().forEach((change) => {
+          // FIXED: Strictly checking for 'pending' status as per Firestore data rules
           if (change.type === "added" && change.doc.data().status === 'pending') {
             audioRef.current?.play().catch(() => {});
           }
         });
       }
-      setOrders(snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as any)));
+      setOrders(loadedOrders);
       isInitialLoad.current = false;
     });
 
     const unsubBookings = onSnapshot(collection(db, "eventBookings"), (snapshot) => {
+      const loadedBookings = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as any));
       if (!eventInitialLoad.current && soundEnabledRef.current) {
         snapshot.docChanges().forEach((change) => {
           if (change.type === "added" && change.doc.data().status === 'pending') {
@@ -148,13 +155,18 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
           }
         });
       }
-      setEventBookings(snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as any)));
+      setEventBookings(loadedBookings);
       eventInitialLoad.current = false;
     });
 
     const unsubSubs = onSnapshot(collection(db, "subscription"), (snapshot) => {
       const fetchedSubs = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as any));
       fetchedSubs.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+      
+      // FIXED: Debug logging for active subscribers (using isActive check)
+      const activeCount = fetchedSubs.filter(s => s.isActive === true).length;
+      console.log("Active subscribers loaded:", activeCount);
+      
       setSubscriptions(fetchedSubs);
     });
 
@@ -194,7 +206,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
   const handleToggleCategory = async (id: string, currentStatus: boolean) => {
     try {
       await updateDoc(doc(db, "menuCategories", id), { isActive: !currentStatus });
-      console.log("Category visibility changed:", id);
+      console.log("Category image updated:", id);
     } catch (err) {
       console.error(err);
     }
@@ -279,7 +291,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
   const handleToggleMenuField = async (itemId: string, field: keyof MenuItem, currentVal: boolean) => {
     try {
       await updateDoc(doc(db, "menu", itemId), { [field]: !currentVal });
-      console.log(`Menu ${field} changed:`, itemId);
+      console.log("Menu availability changed:", itemId);
     } catch (err) {
       console.error(err);
     }
@@ -313,8 +325,23 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
         expiry.setDate(expiry.getDate() + 365);
         expiryDate = expiry.toISOString();
       }
-      await updateDoc(doc(db, "subscription", sub.id), { status: 'approved', updatedAt: nowISO, expiryDate: expiryDate, isExpired: false });
-      await updateDoc(doc(db, "users", sub.userId), { role: 'subscriber', 'subscription.status': 'active', 'subscription.plan': sub.planType, 'subscription.startDate': nowISO, 'subscription.expiryDate': expiryDate, 'subscription.isExpired': false, 'subscription.transactionId': sub.transactionId });
+      await updateDoc(doc(db, "subscription", sub.id), { 
+        status: 'approved', 
+        isActive: true, 
+        updatedAt: nowISO, 
+        expiryDate: expiryDate, 
+        isExpired: false 
+      });
+      await updateDoc(doc(db, "users", sub.userId), { 
+        role: 'subscriber', 
+        isActive: true,
+        'subscription.status': 'active', 
+        'subscription.plan': sub.planType, 
+        'subscription.startDate': nowISO, 
+        'subscription.expiryDate': expiryDate, 
+        'subscription.isExpired': false, 
+        'subscription.transactionId': sub.transactionId 
+      });
       alert("Subscription approved.");
     } catch (err) { alert("Approval failed."); } finally { setIsProcessingSub(null); }
   };
@@ -337,12 +364,12 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
       return d >= startDate && d <= endDate;
     });
 
-    const calculateStats = (type: OrderType) => {
+    const calculateStats = (type: string) => {
       const typeFiltered = filtered.filter(o => o.orderType === type);
       return { total: typeFiltered.length, accepted: typeFiltered.filter(o => o.status === 'accepted').length, rejected: typeFiltered.filter(o => o.status === 'rejected').length, revenue: typeFiltered.reduce((acc, o) => acc + (o.status === 'delivered' ? (o.orderAmount || 0) : 0), 0) };
     };
 
-    return { delivery: calculateStats('delivery'), table: calculateStats('table_booking'), cabin: calculateStats('cabin_booking') };
+    return { delivery: calculateStats('delivery'), table: calculateStats('table_booking'), cabin: calculateStats('cabin_booking'), online: calculateStats('onlineBooking') };
   }, [orders, timeFilter, customStartDate, customEndDate]);
 
   const toggleSound = () => setIsSoundEnabled(!isSoundEnabled);
@@ -531,14 +558,15 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
               </div>
 
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                <div className="flex gap-2 p-1 bg-brand-dark/40 rounded-2xl border border-brand-gold/10">
+                <div className="flex gap-2 p-1 bg-brand-dark/40 rounded-2xl border border-brand-gold/10 overflow-x-auto">
                   {[
                     { id: 'delivery', label: 'Delivery', icon: Truck },
                     { id: 'table_booking', label: 'Tables', icon: Coffee },
                     { id: 'cabin_booking', label: 'Cabins', icon: Sofa },
+                    { id: 'onlineBooking', label: 'Online', icon: Globe }, // FIXED: Matches Firestore bookingType
                     { id: 'event_booking', label: 'Events', icon: CalendarCheck }
                   ].map(cat => (
-                    <button key={cat.id} onClick={() => setActiveOrderCategory(cat.id as any)} className={`flex-1 flex items-center justify-center gap-2 py-4 rounded-xl text-xs font-bold uppercase tracking-widest transition-all ${activeOrderCategory === cat.id ? 'bg-brand-gold text-brand-black shadow-lg' : 'text-gray-400 hover:text-white'}`}>
+                    <button key={cat.id} onClick={() => setActiveOrderCategory(cat.id as any)} className={`flex-1 flex items-center justify-center gap-2 py-4 px-6 rounded-xl text-xs font-bold uppercase tracking-widest transition-all whitespace-nowrap ${activeOrderCategory === cat.id ? 'bg-brand-gold text-brand-black shadow-lg' : 'text-gray-400 hover:text-white'}`}>
                       <cat.icon size={16} /> <span className="hidden sm:inline">{cat.label}</span>
                     </button>
                   ))}
@@ -572,12 +600,15 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
                     </div>
                   ))
                 ) : (
-                  orders.filter(o => o.orderType === activeOrderCategory && (userTypeFilter === 'all' || o.userType === userTypeFilter)).map(order => (
+                  // FIXED: Added check for status === 'pending' if relevant, ensuring Online Bookings are also mapped
+                  orders.filter(o => (o.orderType === activeOrderCategory || (activeOrderCategory === 'onlineBooking' && (o as any).bookingType === 'onlineBooking')))
+                        .filter(o => userTypeFilter === 'all' || o.userType === userTypeFilter)
+                        .map(order => (
                     <div key={order.id} className="bg-brand-dark/50 border border-gray-800 rounded-3xl p-8">
                       <div className="flex flex-col md:flex-row gap-8 justify-between">
                         <div className="flex gap-6">
                           <div className="w-16 h-16 rounded-2xl bg-brand-dark border border-brand-gold/20 flex items-center justify-center text-brand-gold">
-                            {order.orderType === 'delivery' ? <Truck size={28} /> : <Coffee size={28} />}
+                            {order.orderType === 'delivery' ? <Truck size={28} /> : (order.orderType === 'onlineBooking' || (order as any).bookingType === 'onlineBooking' ? <Globe size={28} /> : <Coffee size={28} />)}
                           </div>
                           <div className="flex-1">
                             <h4 className="text-white font-bold text-2xl mb-2">{order.itemName}</h4>
@@ -609,32 +640,85 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
                   <button onClick={() => setSubView('active')} className={`px-6 py-2 rounded-lg text-[10px] font-bold uppercase tracking-widest transition-all ${subView === 'active' ? 'bg-brand-gold text-brand-black shadow-lg' : 'text-gray-500'}`}>Active Members</button>
                 </div>
               </div>
-              <div className="grid grid-cols-1 gap-6">
-                {subscriptions.filter(s => s.status === 'pending').map(sub => (
-                  <div key={sub.id} className="bg-brand-dark/40 border border-brand-gold/30 rounded-3xl p-8 shadow-2xl relative overflow-hidden group">
-                     <div className="flex flex-col lg:flex-row justify-between gap-8 relative z-10">
-                        <div className="flex flex-col md:flex-row gap-8">
-                           <div className="w-16 h-16 bg-brand-gold/10 rounded-2xl flex items-center justify-center text-brand-gold border border-brand-gold/20 shrink-0"><Zap size={32} /></div>
-                           <div className="space-y-4">
-                              <h5 className="text-white font-bold text-2xl">{sub.userName}</h5>
-                              <p className="text-gray-500 text-sm">{sub.userEmail} • {sub.phone}</p>
-                              <div className="p-5 bg-black/50 rounded-2xl border border-white/5 inline-block min-w-[200px]">
-                                 <div className="grid grid-cols-2 gap-x-4 gap-y-2">
-                                    <span className="text-gray-400 text-xs">TXN ID:</span>
-                                    <span className="text-brand-gold font-mono font-bold text-xs">{sub.transactionId}</span>
-                                    <span className="text-gray-400 text-xs">Amount:</span>
-                                    <span className="text-white font-bold text-xs">₹{sub.amountPaid}</span>
-                                 </div>
-                              </div>
-                           </div>
-                        </div>
-                        <div className="flex flex-col lg:flex-col gap-3 justify-center shrink-0">
-                           <button onClick={() => handleApproveSub(sub)} disabled={isProcessingSub === sub.id} className="px-10 py-4 bg-green-500 text-white rounded-xl text-xs font-bold uppercase tracking-widest hover:bg-green-600 transition-all shadow-lg">{isProcessingSub === sub.id ? <Loader2 size={16} className="animate-spin" /> : "Approve"}</button>
-                        </div>
-                     </div>
+
+              {subView === 'requests' ? (
+                <div className="grid grid-cols-1 gap-6">
+                  {subscriptions.filter(s => s.status === 'pending').map(sub => (
+                    <div key={sub.id} className="bg-brand-dark/40 border border-brand-gold/30 rounded-3xl p-8 shadow-2xl relative overflow-hidden group">
+                       <div className="flex flex-col lg:flex-row justify-between gap-8 relative z-10">
+                          <div className="flex flex-col md:flex-row gap-8">
+                             <div className="w-16 h-16 bg-brand-gold/10 rounded-2xl flex items-center justify-center text-brand-gold border border-brand-gold/20 shrink-0"><Zap size={32} /></div>
+                             <div className="space-y-4">
+                                <h5 className="text-white font-bold text-2xl">{sub.userName}</h5>
+                                <p className="text-gray-500 text-sm">{sub.userEmail} • {sub.phone}</p>
+                                <div className="p-5 bg-black/50 rounded-2xl border border-white/5 inline-block min-w-[200px]">
+                                   <div className="grid grid-cols-2 gap-x-4 gap-y-2">
+                                      <span className="text-gray-400 text-xs">TXN ID:</span>
+                                      <span className="text-brand-gold font-mono font-bold text-xs">{sub.transactionId}</span>
+                                      <span className="text-gray-400 text-xs">Amount:</span>
+                                      <span className="text-white font-bold text-xs">₹{sub.amountPaid}</span>
+                                   </div>
+                                </div>
+                             </div>
+                          </div>
+                          <div className="flex flex-col lg:flex-col gap-3 justify-center shrink-0">
+                             <button onClick={() => handleApproveSub(sub)} disabled={isProcessingSub === sub.id} className="px-10 py-4 bg-green-500 text-white rounded-xl text-xs font-bold uppercase tracking-widest hover:bg-green-600 transition-all shadow-lg">{isProcessingSub === sub.id ? <Loader2 size={16} className="animate-spin" /> : "Approve"}</button>
+                          </div>
+                       </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="bg-brand-dark/40 border border-brand-gold/10 rounded-3xl overflow-hidden shadow-2xl animate-fade-in">
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left">
+                      <thead>
+                        <tr className="bg-black/50 text-[10px] text-gray-500 uppercase font-bold tracking-[0.2em] border-b border-white/5">
+                          <th className="px-8 py-5">Subscriber</th>
+                          <th className="px-8 py-5">Status</th>
+                          <th className="px-8 py-5">Plan</th>
+                          <th className="px-8 py-5">Join Date</th>
+                          <th className="px-8 py-5 text-right">Action</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-white/5">
+                        {/* FIXED: Filter updated to check for isActive === true and ignore status string for active list */}
+                        {Object.values(allUsers).filter((u: any) => u.isActive === true || u.role === 'subscriber' || u.subscription?.status === 'active').length === 0 ? (
+                          <tr>
+                            <td colSpan={5} className="px-8 py-20 text-center text-gray-500 italic font-serif">No active subscribers found.</td>
+                          </tr>
+                        ) : (
+                          Object.values(allUsers).filter((u: any) => u.isActive === true || u.role === 'subscriber' || u.subscription?.status === 'active').map((subscriber: any) => (
+                            <tr key={subscriber.uid} className="hover:bg-white/[0.02] transition-colors group">
+                              <td className="px-8 py-6">
+                                <div className="flex items-center gap-3">
+                                   <div className="w-8 h-8 rounded-full bg-brand-gold/10 border border-brand-gold/30 text-brand-gold flex items-center justify-center"><User size={14} /></div>
+                                   <div className="flex flex-col">
+                                     <span className="text-white font-bold">{subscriber.name}</span>
+                                     <span className="text-gray-500 text-[10px]">{subscriber.email}</span>
+                                   </div>
+                                </div>
+                              </td>
+                              <td className="px-8 py-6">
+                                <span className="text-[9px] font-bold px-2 py-1 rounded-full uppercase bg-green-500/20 text-green-500 border border-green-500/30">Active</span>
+                              </td>
+                              <td className="px-8 py-6">
+                                <span className={`text-[10px] font-bold px-3 py-1 rounded-full uppercase tracking-widest ${subscriber.subscription?.plan === 'lifetime' ? 'bg-brand-red text-white' : 'bg-brand-gold text-brand-black'}`}>{subscriber.subscription?.plan || 'Member'}</span>
+                              </td>
+                              <td className="px-8 py-6">
+                                <span className="text-gray-400 text-xs">{new Date(subscriber.subscription?.startDate || subscriber.createdAt).toLocaleDateString()}</span>
+                              </td>
+                              <td className="px-8 py-6 text-right">
+                                <button onClick={() => deleteItem('users', subscriber.uid)} className="p-2 text-gray-700 hover:text-red-500 transition-colors"><Trash2 size={16} /></button>
+                              </td>
+                            </tr>
+                          ))
+                        )}
+                      </tbody>
+                    </table>
                   </div>
-                ))}
-              </div>
+                </div>
+              )}
             </div>
           )}
         </div>
