@@ -15,7 +15,7 @@ import {
 import { 
   Plus, Trash2, Utensils, Calendar, 
   Tag, ShoppingBag, Clock, CheckCircle2, XCircle, LogOut, Truck, Sofa, Coffee, Check, AlertTriangle, Zap, User, ShieldCheck, Mail, Smartphone, Loader2,
-  Play, Volume2, VolumeX
+  Play, Volume2, VolumeX, Ban
 } from 'lucide-react';
 import { MenuItem, FestivalSpecial, CategoryConfig, Order, OrderStatus, SubscriptionRequest } from '../types';
 import { getOptimizedImageURL } from '../constants';
@@ -34,6 +34,11 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
   const [isVerifying, setIsVerifying] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   
+  // Rejection Modal State
+  const [rejectingOrder, setRejectingOrder] = useState<string | null>(null);
+  const [rejectReason, setRejectReason] = useState('');
+  const [customRejectReason, setCustomRejectReason] = useState('');
+
   // Sound Notification States
   const [isSoundEnabled, setIsSoundEnabled] = useState(false);
   const soundEnabledRef = useRef(false);
@@ -65,29 +70,23 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
     });
 
     const unsubOrders = onSnapshot(collection(db, "orders"), (snapshot) => {
-      // 1. SOUND NOTIFICATION LOGIC
-      // onSnapshot fires with 'added' changes for initial docs, so we skip the very first load
       if (!isInitialLoad.current && soundEnabledRef.current) {
         snapshot.docChanges().forEach((change) => {
           if (change.type === "added") {
             const data = change.doc.data() as Order;
-            // Only alert for NEW pending orders
             if (data.status === 'pending') {
               console.log("🔔 New order received! Playing notification sound...");
               audioRef.current?.play().catch(err => {
-                console.error("Audio playback failed (usually needs user interaction):", err);
+                console.error("Audio playback failed:", err);
               });
             }
           }
         });
       }
 
-      // 2. STATE SYNCING
       const fetchedOrders = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as any));
       fetchedOrders.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
       setOrders(fetchedOrders);
-
-      // 3. COMPLETE INITIAL LOAD
       isInitialLoad.current = false;
     });
 
@@ -100,12 +99,11 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
     return () => { 
       unsubMenu(); unsubFest(); unsubCats(); unsubOrders(); unsubSubs(); 
     };
-  }, [isSoundEnabled]); // Re-register sound ref if state toggles
+  }, [isSoundEnabled]);
 
   const toggleSound = () => {
     const newState = !isSoundEnabled;
     setIsSoundEnabled(newState);
-    // Primes the audio element so browsers allow automatic play later
     if (newState && audioRef.current) {
       audioRef.current.play().then(() => {
         audioRef.current?.pause();
@@ -133,6 +131,32 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
     } catch (err) { 
       console.error("Order update error:", err);
       alert("Error updating order status."); 
+    }
+  };
+
+  const handleRejectOrder = async () => {
+    if (!rejectingOrder) return;
+    const reason = rejectReason === 'Other' ? customRejectReason : rejectReason;
+    if (!reason) {
+      alert("Please provide a reason for rejection.");
+      return;
+    }
+
+    try {
+      console.log(`REJECTING: Order ${rejectingOrder} for reason: ${reason}`);
+      const orderRef = doc(db, "orders", rejectingOrder);
+      await updateDoc(orderRef, {
+        status: 'rejected',
+        rejectReason: reason,
+        updatedAt: new Date().toISOString()
+      });
+      alert("Order rejected successfully.");
+      setRejectingOrder(null);
+      setRejectReason('');
+      setCustomRejectReason('');
+    } catch (err) {
+      console.error("Rejection error:", err);
+      alert("Failed to reject order.");
     }
   };
 
@@ -263,7 +287,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
             </button>
           ))}
 
-          {/* Real-time Notification Toggle */}
           <button 
             onClick={toggleSound}
             className={`flex items-center gap-2 px-6 py-2 rounded-md font-bold text-[10px] uppercase tracking-widest transition-all ml-2 border ${isSoundEnabled ? 'border-brand-gold text-brand-gold bg-brand-gold/10' : 'border-gray-800 text-gray-500 hover:text-white animate-pulse'}`}
@@ -351,11 +374,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
                        </div>
                     </div>
                   ))}
-                  {pendingSubs.length === 0 && (
-                    <div className="text-center py-28 border-2 border-dashed border-gray-800 rounded-3xl text-gray-600 uppercase font-bold tracking-widest">
-                       No pending activations.
-                    </div>
-                  )}
                 </div>
 
                 <div className="space-y-6 pt-12">
@@ -406,9 +424,19 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
                           <div className="flex flex-wrap items-center gap-3 mb-2">
                             <h4 className="text-white font-bold text-2xl">{order.itemName || 'Untitled Item'} <span className="text-brand-gold text-lg">x {order.quantity || 1}</span></h4>
                             <span className="text-[10px] bg-brand-gold/10 text-brand-gold px-3 py-1 rounded-full uppercase font-bold tracking-widest">{oType.replace('_', ' ')}</span>
+                            {order.status === 'rejected' && (
+                              <span className="text-[10px] bg-red-500/10 text-red-500 px-3 py-1 rounded-full uppercase font-bold tracking-widest flex items-center gap-1">
+                                <Ban size={10} /> Rejected
+                              </span>
+                            )}
                           </div>
                           <p className="text-sm text-gray-500 font-medium">Customer: <span className="text-white">{order.userName || 'Guest'}</span> • {order.userPhone}</p>
                           <p className="text-sm text-gray-400 mt-3 flex items-start gap-2 max-w-lg"><Tag size={14} className="mt-1 shrink-0 text-brand-gold" /> {order.address || 'No address provided'}</p>
+                          {order.rejectReason && (
+                            <p className="text-xs text-red-400 mt-3 font-medium bg-red-500/5 px-4 py-2 rounded-xl border border-red-500/10 italic">
+                              Reason: {order.rejectReason}
+                            </p>
+                          )}
                           <div className="mt-5 inline-flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest bg-gray-900 text-gray-400 px-4 py-1.5 rounded-full border border-white/5">
                             <Clock size={12} /> Status: <span className="text-white">{statusLabel}</span>
                           </div>
@@ -422,8 +450,24 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
                         </div>
                         
                         <div className="flex gap-2 w-full md:w-auto">
-                          {action && (
-                            <button 
+                          {order.status === 'pending' && (
+                            <>
+                              <button 
+                                onClick={() => handleUpdateOrderStatus(order.id, 'accepted')}
+                                className="flex-1 md:flex-none flex items-center justify-center gap-2 px-6 py-3 bg-blue-500 text-white rounded-xl text-[10px] font-bold uppercase tracking-widest hover:brightness-110 active:scale-95 transition-all shadow-lg"
+                              >
+                                <Check size={16} /> Accept Order
+                              </button>
+                              <button 
+                                onClick={() => setRejectingOrder(order.id)}
+                                className="flex-1 md:flex-none flex items-center justify-center gap-2 px-6 py-3 bg-red-500 text-white rounded-xl text-[10px] font-bold uppercase tracking-widest hover:brightness-110 active:scale-95 transition-all shadow-lg"
+                              >
+                                <Ban size={16} /> Reject
+                              </button>
+                            </>
+                          )}
+                          {order.status !== 'pending' && order.status !== 'rejected' && order.status !== 'delivered' && action && (
+                             <button 
                               onClick={() => handleUpdateOrderStatus(order.id, action.next as OrderStatus)}
                               className={`flex-1 md:flex-none flex items-center justify-center gap-2 px-6 py-3 ${action.color} text-white rounded-xl text-[10px] font-bold uppercase tracking-widest hover:brightness-110 active:scale-95 transition-all shadow-lg`}
                             >
@@ -437,12 +481,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
                   </div>
                 );
               })}
-              {orders.length === 0 && (
-                <div className="text-center py-40 border-2 border-dashed border-gray-900 rounded-3xl text-gray-700">
-                  <ShoppingBag size={48} className="mx-auto mb-4 opacity-20" />
-                  <p className="uppercase tracking-[0.2em] font-bold text-xs">No orders in the system.</p>
-                </div>
-              )}
             </div>
           )}
 
@@ -460,6 +498,62 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
           )}
         </div>
       </div>
+
+      {/* Reject Reason Modal */}
+      {rejectingOrder && (
+        <div className="fixed inset-0 z-[110] bg-black/80 backdrop-blur-md flex items-center justify-center p-4 animate-fade-in">
+          <div className="bg-brand-dark border border-brand-red/30 rounded-3xl p-8 w-full max-w-md shadow-2xl animate-fade-in-up">
+            <div className="flex items-center gap-4 mb-8">
+              <div className="w-12 h-12 bg-red-500/10 rounded-xl flex items-center justify-center text-red-500 border border-red-500/20">
+                <Ban size={24} />
+              </div>
+              <h3 className="text-2xl font-display font-bold text-white uppercase tracking-widest">Reject Order</h3>
+            </div>
+            
+            <div className="space-y-6">
+              <div>
+                <label className="text-[10px] text-gray-500 uppercase font-bold tracking-widest mb-3 block">Select Reason</label>
+                <select 
+                  className="w-full bg-black/40 border border-gray-800 rounded-xl p-4 text-white focus:border-brand-red outline-none transition-all"
+                  value={rejectReason}
+                  onChange={(e) => setRejectReason(e.target.value)}
+                >
+                  <option value="">Choose a reason...</option>
+                  <option value="Item unavailable">Item unavailable</option>
+                  <option value="Kitchen busy">Kitchen busy</option>
+                  <option value="Shop closed">Shop closed</option>
+                  <option value="Delivery not available">Delivery not available</option>
+                  <option value="Other">Custom Reason...</option>
+                </select>
+              </div>
+
+              {rejectReason === 'Other' && (
+                <textarea 
+                  placeholder="Enter custom reason..."
+                  className="w-full bg-black/40 border border-gray-800 rounded-xl p-4 text-white focus:border-brand-red outline-none transition-all h-24 resize-none"
+                  value={customRejectReason}
+                  onChange={(e) => setCustomRejectReason(e.target.value)}
+                />
+              )}
+
+              <div className="flex gap-3 pt-4">
+                <button 
+                  onClick={handleRejectOrder}
+                  className="flex-1 py-4 bg-red-500 text-white rounded-xl text-xs font-bold uppercase tracking-widest hover:bg-red-600 transition-all shadow-lg"
+                >
+                  Confirm Reject
+                </button>
+                <button 
+                  onClick={() => { setRejectingOrder(null); setRejectReason(''); setCustomRejectReason(''); }}
+                  className="px-8 py-4 bg-gray-800 text-gray-400 rounded-xl text-xs font-bold uppercase tracking-widest hover:bg-gray-700 transition-all"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

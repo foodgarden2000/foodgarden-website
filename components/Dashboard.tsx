@@ -4,7 +4,7 @@ import { User as FirebaseUser, signOut } from "https://www.gstatic.com/firebasej
 import { auth, db } from '../firebase';
 import Auth from './Auth';
 import { 
-  ArrowLeft, Award, LogOut, User, ShoppingBag, Clock, Share2, Copy, Check, Gift, Truck, Coffee, Sofa, AlertCircle, Loader2, Smartphone, ShieldCheck, Zap, CreditCard, ExternalLink, ArrowRight
+  ArrowLeft, Award, LogOut, User, ShoppingBag, Clock, Share2, Copy, Check, Gift, Truck, Coffee, Sofa, AlertCircle, Loader2, Smartphone, ShieldCheck, Zap, CreditCard, ExternalLink, ArrowRight, Ban
 } from 'lucide-react';
 import { 
   doc, 
@@ -48,7 +48,6 @@ const Dashboard: React.FC<DashboardProps> = ({ user, points, onBack, adminMode, 
 
     setLoadingProfile(true);
 
-    // 1. Profile Listener
     const unsubProfile = onSnapshot(doc(db, "users", user.uid), async (docSnap) => {
       if (docSnap.exists()) {
         const data = docSnap.data() as UserProfile;
@@ -62,7 +61,6 @@ const Dashboard: React.FC<DashboardProps> = ({ user, points, onBack, adminMode, 
       setLoadingProfile(false);
     });
 
-    // 2. Orders Listener - Sorted on client to avoid index error
     const qOrders = query(collection(db, "orders"), where("userId", "==", user.uid));
     const unsubOrders = onSnapshot(qOrders, (snapshot) => {
       const orders = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Order));
@@ -73,7 +71,6 @@ const Dashboard: React.FC<DashboardProps> = ({ user, points, onBack, adminMode, 
       setOrderError("Unable to sync your orders.");
     });
 
-    // 3. Subscription Request Listener - Simplified to avoid index errors
     const qSub = query(
       collection(db, "subscription"), 
       where("userId", "==", user.uid),
@@ -281,14 +278,32 @@ const Dashboard: React.FC<DashboardProps> = ({ user, points, onBack, adminMode, 
               </div>
             ) : (
               myOrders.map(order => (
-                <div key={order.id} className="bg-white rounded-2xl p-6 border flex justify-between items-center">
-                  <div>
-                    <h4 className="font-bold text-xl">{order.itemName}</h4>
-                    <span className="text-[10px] uppercase font-bold text-brand-gold">{order.status}</span>
+                <div key={order.id} className={`bg-white rounded-2xl p-6 border flex flex-col md:flex-row justify-between md:items-center gap-4 transition-all ${order.status === 'rejected' ? 'border-red-200' : 'border-gray-100'}`}>
+                  <div className="flex-1">
+                    <div className="flex items-center gap-3 mb-1">
+                      <h4 className="font-bold text-xl">{order.itemName}</h4>
+                      <span className={`text-[10px] uppercase font-bold px-3 py-1 rounded-full ${order.status === 'rejected' ? 'bg-red-500 text-white' : order.status === 'delivered' ? 'bg-green-500 text-white' : 'bg-brand-gold/10 text-brand-gold'}`}>
+                        {order.status}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-4 text-xs text-gray-500 font-sans">
+                       <span className="flex items-center gap-1"><Clock size={12}/> {new Date(order.createdAt).toLocaleDateString()}</span>
+                       <span className="flex items-center gap-1 uppercase tracking-tighter">{order.orderType.replace('_', ' ')}</span>
+                    </div>
+                    {order.status === 'rejected' && order.rejectReason && (
+                      <div className="mt-4 p-4 bg-red-50 border border-red-100 rounded-xl flex items-start gap-3">
+                         <Ban size={16} className="text-red-500 mt-0.5 shrink-0" />
+                         <div>
+                            <p className="text-[10px] text-red-500 uppercase font-bold tracking-widest mb-1">Order Rejected</p>
+                            <p className="text-xs text-red-700 font-medium italic">"{order.rejectReason}"</p>
+                         </div>
+                      </div>
+                    )}
                   </div>
-                  <div className="text-right">
+                  <div className="text-right shrink-0">
                     <p className="text-2xl font-display font-bold">₹{order.orderAmount}</p>
-                    <p className="text-xs text-brand-gold">+{order.pointsEarned} Points</p>
+                    {order.status !== 'rejected' && <p className="text-xs text-brand-gold">+{order.pointsEarned} Points</p>}
+                    {order.status === 'rejected' && <p className="text-[10px] text-red-400 font-bold uppercase tracking-widest">Cancelled</p>}
                   </div>
                 </div>
               ))
