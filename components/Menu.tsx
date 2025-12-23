@@ -115,7 +115,7 @@ const Menu: React.FC<MenuProps> = ({ whatsappNumber, user, currentPoints, onNavi
       pointsUsed: selectedPaymentMode === 'points' ? requiredPoints : 0,
       amountEquivalent: selectedPaymentMode === 'points' ? totalAmount : 0,
       pointsDeducted: false,
-      pointsEarned: selectedPaymentMode === 'points' ? 0 : potentialPoints, // Don't earn points on point orders
+      pointsEarned: selectedPaymentMode === 'points' ? 0 : potentialPoints, // EARN 0 ON POINT ORDERS
       pointsCredited: false,
       notes: orderFormData.notes,
       createdAt: new Date().toISOString()
@@ -123,7 +123,12 @@ const Menu: React.FC<MenuProps> = ({ whatsappNumber, user, currentPoints, onNavi
 
     try {
       const docRef = await addDoc(collection(db, "orders"), orderData);
-      console.log("Order Created:", docRef.id, "Payment Mode:", selectedPaymentMode);
+      
+      // Mandatory Debug Logs
+      console.log("Payment Mode:", selectedPaymentMode);
+      console.log("Points Used:", orderData.pointsUsed);
+      console.log("Earned Points:", orderData.pointsEarned);
+      console.log("User Current Points:", userProfile?.points || 0);
       
       const message = `*NEW ${orderFormData.type.replace('_', ' ').toUpperCase()} (${userType.toUpperCase()}) - Chef's Jalsa*\n` +
                       `*Order ID:* ${docRef.id}\n` +
@@ -140,7 +145,7 @@ const Menu: React.FC<MenuProps> = ({ whatsappNumber, user, currentPoints, onNavi
       
       setIsOrderModalOpen(false);
       alert(selectedPaymentMode === 'points' 
-        ? "Order submitted via Points! Points will be deducted after successful delivery." 
+        ? "Order submitted via Points! Points will be deducted after successful delivery. No points are earned for this order." 
         : "Order submitted successfully! You can track live status in your dashboard.");
     } catch (err) { 
       console.error(err);
@@ -306,6 +311,7 @@ const Menu: React.FC<MenuProps> = ({ whatsappNumber, user, currentPoints, onNavi
                     <span className="text-xs font-bold text-brand-gold/60 uppercase tracking-widest block mb-1">Points to Deduct</span>
                     <span className="text-2xl font-display font-bold text-brand-gold">-{requiredRedeemPoints} Points</span>
                     <p className="text-[10px] text-gray-400 font-bold uppercase mt-1">Value: ₹{totalAmount}</p>
+                    <p className="text-[9px] text-brand-red font-bold uppercase mt-1">No points earned on this order</p>
                   </div>
                   <Coins size={32} className="text-brand-gold" />
                 </div>

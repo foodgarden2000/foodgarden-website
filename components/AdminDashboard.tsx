@@ -13,7 +13,7 @@ import {
 import { 
   Plus, Trash2, Utensils, Calendar, 
   Tag, ShoppingBag, Clock, CheckCircle2, XCircle, LogOut, Truck, Sofa, Coffee, Check, AlertTriangle, Zap, User, ShieldCheck, Mail, Smartphone, Loader2,
-  Play, Volume2, VolumeX, Ban, Filter, BarChart3, CalendarDays, ChevronRight, Star, X, Coins
+  Play, Volume2, VolumeX, Ban, Filter, BarChart3, CalendarDays, ChevronRight, Star, X, Coins, Wallet
 } from 'lucide-react';
 import { MenuItem, FestivalSpecial, CategoryConfig, Order, OrderStatus, SubscriptionRequest, OrderType, UserCategory } from '../types';
 import { getOptimizedImageURL } from '../constants';
@@ -36,6 +36,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
   const [categories, setCategories] = useState<(CategoryConfig & { id: string })[]>([]);
   const [orders, setOrders] = useState<(Order & { id: string })[]>([]);
   const [subscriptions, setSubscriptions] = useState<(SubscriptionRequest & { id: string })[]>([]);
+  const [allUsers, setAllUsers] = useState<Record<string, any>>({});
   const [isVerifying, setIsVerifying] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   
@@ -83,6 +84,15 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
       setCategories(snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as any)));
     });
 
+    // Sync Users to show Current Point Balances
+    const unsubUsers = onSnapshot(collection(db, "users"), (snapshot) => {
+      const userMap: Record<string, any> = {};
+      snapshot.docs.forEach(doc => {
+        userMap[doc.id] = doc.data();
+      });
+      setAllUsers(userMap);
+    });
+
     const unsubOrders = onSnapshot(collection(db, "orders"), (snapshot) => {
       if (!isInitialLoad.current && soundEnabledRef.current) {
         snapshot.docChanges().forEach((change) => {
@@ -124,7 +134,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
     });
 
     return () => { 
-      unsubMenu(); unsubFest(); unsubCats(); unsubOrders(); unsubSubs(); 
+      unsubMenu(); unsubFest(); unsubCats(); unsubOrders(); unsubSubs(); unsubUsers();
     };
   }, [isSoundEnabled]);
 
@@ -213,18 +223,30 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
       if (!orderSnap.exists()) return;
 
       const order = orderSnap.data() as Order;
+      const currentUserProfile = order.userId ? allUsers[order.userId] : null;
 
-      // Point Deduction Logic for Point Orders
+      // Mandatory Debug Logs
+      console.log("Processing Order Delivery Confirmation:", orderId);
+      console.log("Payment Mode:", order.paymentMode);
+      console.log("Points Used:", order.pointsUsed);
+      console.log("Earned Points (Saved in Doc):", order.pointsEarned);
+      if (currentUserProfile) {
+        console.log("User Current Points (Before update):", currentUserProfile.points);
+      }
+
+      // 1. POINT DEDUCTION FOR REDEMPTION ORDERS
       if (newStatus === 'delivered' && order.paymentMode === 'points' && !order.pointsDeducted && order.userId) {
-        console.log("Points Deducted:", order.pointsUsed, "for Order:", orderId);
+        console.log("DEDUCTING POINTS: -", order.pointsUsed);
         await updateDoc(doc(db, "users", order.userId), {
           points: increment(-(order.pointsUsed || 0))
         });
         await updateDoc(orderRef, { pointsDeducted: true });
+        // NOTE: No earnedPoints added for point orders (already 0 in doc)
       }
 
-      // Point Earning Logic for Normal Orders
+      // 2. POINT EARNING FOR PAID ORDERS
       if (newStatus === 'delivered' && order.paymentMode !== 'points' && order.userId && !order.pointsCredited) {
+        console.log("ADDING EARNED POINTS: +", order.pointsEarned);
         await updateDoc(doc(db, "users", order.userId), { 
           points: increment(order.pointsEarned || 0) 
         });
@@ -358,7 +380,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
           </span>
         );
       default:
-        // Handle existing guest orders badge if they still exist in DB
         return (
           <span className="bg-gray-600 text-gray-200 px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest">
             Legacy Guest
@@ -593,6 +614,9 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
                       const isAdminCancelled = order.status === 'cancelled_by_admin';
                       const isCancelled = isUserCancelled || isAdminCancelled;
                       
+                      const orderUser = order.userId ? allUsers[order.userId] : null;
+                      const userPointsBalance = orderUser?.points ?? 0;
+
                       return (
                         <div key={order.id} className={`bg-brand-dark/50 backdrop-blur-xl border rounded-3xl p-8 transition-all group ${order.status === 'pending' ? 'border-brand-gold shadow-[0_0_20px_rgba(212,175,55,0.05)]' : isUserCancelled ? 'border-red-600/50 bg-red-900/10 shadow-[0_0_15px_rgba(220,38,38,0.1)]' : isCancelled ? 'border-red-900/50 bg-red-950/10' : 'border-gray-800'}`}>
                           <div className="flex flex-col md:flex-row gap-8 justify-between">
@@ -608,9 +632,13 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
                                   {getUserTypeBadge(order.userType)}
 
                                   {/* Payment Mode Badge */}
-                                  {order.paymentMode === 'points' && (
+                                  {order.paymentMode === 'points' ? (
                                     <span className="flex items-center gap-1.5 bg-brand-black text-brand-gold border border-brand-gold/50 px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest shadow-lg">
                                       POINT ORDER <Coins size={10} fill="currentColor" />
+                                    </span>
+                                  ) : (
+                                    <span className="flex items-center gap-1.5 bg-green-950 text-green-400 border border-green-900 px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest shadow-lg">
+                                      PAID ORDER <Wallet size={10} fill="currentColor" />
                                     </span>
                                   )}
 
@@ -627,9 +655,16 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
                                     <span className="text-[10px] bg-green-500/10 text-green-500 px-3 py-1 rounded-full uppercase font-bold tracking-widest flex items-center gap-1"><CheckCircle2 size={10} /> {order.orderType === 'delivery' ? 'Delivered' : 'Completed'}</span>
                                   )}
                                 </div>
-                                <p className="text-sm text-gray-500 font-medium flex items-center gap-2">
-                                  <User size={14} className="text-brand-gold" /> {order.userName || 'Member'} • {order.userPhone}
-                                </p>
+
+                                <div className="flex flex-wrap gap-x-6 gap-y-2 mb-4">
+                                  <p className="text-sm text-gray-300 font-medium flex items-center gap-2">
+                                    <User size={14} className="text-brand-gold" /> {order.userName || 'Member'} • {order.userPhone}
+                                  </p>
+                                  <p className="text-sm text-gray-400 font-medium flex items-center gap-2">
+                                    <Wallet size={14} className="text-brand-gold" /> User Balance: <span className="text-white font-bold">{userPointsBalance} pts</span>
+                                  </p>
+                                </div>
+
                                 <div className="mt-5 flex flex-wrap items-center gap-4 text-[10px] font-bold uppercase tracking-widest">
                                   <div className="bg-gray-900 text-gray-400 px-4 py-1.5 rounded-full border border-white/5 flex items-center gap-2">
                                     <Clock size={12} /> Status: <span className={`text-white uppercase ${isCancelled || order.status === 'rejected' ? 'text-red-500 font-bold' : ''}`}>{statusLabel}</span>
@@ -652,16 +687,19 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
                             <div className="flex flex-col md:items-end justify-between gap-6 shrink-0">
                               <div className="text-right">
                                 {order.orderType === 'delivery' ? (
-                                  <>
+                                  <div className="space-y-1">
                                     <p className="text-4xl font-display font-bold text-white mb-1">
                                       {order.paymentMode === 'points' ? `${order.pointsUsed} pts` : `₹${order.orderAmount || 0}`}
                                     </p>
-                                    {order.paymentMode === 'points' ? (
-                                      <p className="text-[10px] text-brand-gold uppercase tracking-widest font-bold">Equiv: ₹{order.amountEquivalent}</p>
-                                    ) : (
-                                      <p className="text-[10px] text-brand-gold uppercase tracking-widest font-bold">Earns: {order.pointsEarned}</p>
-                                    )}
-                                  </>
+                                    <div className="flex flex-col items-end gap-1">
+                                       {order.paymentMode === 'points' && (
+                                          <span className="text-[10px] text-brand-gold uppercase font-bold tracking-widest bg-brand-gold/10 px-2 py-0.5 rounded border border-brand-gold/20">Used: {order.pointsUsed} pts</span>
+                                       )}
+                                       <span className={`text-[10px] uppercase font-bold tracking-widest px-2 py-0.5 rounded border ${order.paymentMode === 'points' ? 'text-red-400 border-red-900/30 bg-red-950/20' : 'text-green-400 border-green-900/30 bg-green-950/20'}`}>
+                                          {order.paymentMode === 'points' ? 'Earned: 0 pts' : `Earns: ${order.pointsEarned} pts`}
+                                       </span>
+                                    </div>
+                                  </div>
                                 ) : (
                                   <div className="flex flex-col gap-1 items-end">
                                     <p className="text-xl font-display text-white uppercase tracking-widest">{order.orderType === 'table_booking' ? 'Table' : 'Cabin'}</p>
