@@ -4,7 +4,7 @@ import { db } from '../firebase';
 import { collection, onSnapshot, query, orderBy, addDoc, doc, getDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 import { User } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
 import { Utensils, Loader2, ArrowLeft, X, Minus, Plus, Award, ChevronRight, Truck, Coffee, Sofa } from 'lucide-react';
-import { MenuItem, CategoryConfig, Order, OrderType, UserProfile } from '../types';
+import { MenuItem, CategoryConfig, Order, OrderType, UserProfile, UserCategory } from '../types';
 import { getOptimizedImageURL } from '../constants';
 
 interface MenuProps {
@@ -46,13 +46,11 @@ const Menu: React.FC<MenuProps> = ({ whatsappNumber, user, currentPoints }) => {
     const unsubMenu = onSnapshot(qMenu, (snapshot) => {
       const fetchedItems = snapshot.docs.map(doc => doc.data() as MenuItem);
       setItems(fetchedItems);
-      // Explicitly cast the unique categories to a string array to fix the TypeScript error.
       const cats = Array.from(new Set(fetchedItems.map(i => i.category))).sort() as string[];
       setUniqueCategories(cats);
       setLoading(false);
     });
 
-    // Real-time user profile listener for role/subscription updates
     let unsubProfile = () => {};
     if (user) {
       unsubProfile = onSnapshot(doc(db, "users", user.uid), (snap) => {
@@ -66,7 +64,6 @@ const Menu: React.FC<MenuProps> = ({ whatsappNumber, user, currentPoints }) => {
   const calculatePotentialPoints = (priceStr: string, quantity: number) => {
     const cleanPrice = parseInt(priceStr.replace(/\D/g, '')) || 0;
     const total = cleanPrice * quantity;
-    // Premium Subscribers earn 15% points, others earn 10%
     const rate = userProfile?.role === 'subscriber' ? 0.15 : 0.10;
     return Math.floor(total * rate);
   };
@@ -78,8 +75,17 @@ const Menu: React.FC<MenuProps> = ({ whatsappNumber, user, currentPoints }) => {
     const cleanPrice = parseInt(selectedOrderItem.price?.replace(/\D/g, '') || "0");
     const potentialPoints = calculatePotentialPoints(selectedOrderItem.price || "0", orderFormData.quantity);
 
+    // Identify User Type
+    let userType: UserCategory = 'normal';
+    if (user) {
+      userType = userProfile?.role === 'subscriber' ? 'subscriber' : 'registered';
+    }
+
+    console.log("Submitting Order | User Type:", userType);
+
     const orderData: Order = {
       userId: user?.uid || null,
+      userType: userType,
       userName: orderFormData.name,
       userPhone: orderFormData.phone,
       address: orderFormData.address,
@@ -97,7 +103,7 @@ const Menu: React.FC<MenuProps> = ({ whatsappNumber, user, currentPoints }) => {
     try {
       const docRef = await addDoc(collection(db, "orders"), orderData);
       
-      const message = `*NEW ${orderFormData.type.replace('_', ' ').toUpperCase()} - Chef's Jalsa*\n` +
+      const message = `*NEW ${orderFormData.type.replace('_', ' ').toUpperCase()} (${userType.toUpperCase()}) - Chef's Jalsa*\n` +
                       `*Order ID:* ${docRef.id}\n` +
                       `*Item:* ${selectedOrderItem.name}\n` +
                       `*Qty:* ${orderFormData.quantity}\n` +

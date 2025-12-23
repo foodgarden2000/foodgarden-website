@@ -1,8 +1,8 @@
 
 import React, { useState, useEffect } from 'react';
 import { db, auth } from '../firebase';
-import { collection, addDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
-import { OrderType } from '../types';
+import { collection, addDoc, doc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+import { OrderType, UserCategory, UserProfile } from '../types';
 
 interface ReservationProps {
   whatsappNumber: string;
@@ -18,6 +18,18 @@ const Reservation: React.FC<ReservationProps> = ({ whatsappNumber }) => {
     type: 'table_booking' as OrderType
   });
 
+  const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
+
+  useEffect(() => {
+    const user = auth.currentUser;
+    if (user) {
+      const unsub = onSnapshot(doc(db, "users", user.uid), (snap) => {
+        if (snap.exists()) setUserProfile(snap.data() as UserProfile);
+      });
+      return () => unsub();
+    }
+  }, []);
+
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
@@ -26,14 +38,24 @@ const Reservation: React.FC<ReservationProps> = ({ whatsappNumber }) => {
     e.preventDefault();
     
     const user = auth.currentUser;
+
+    // Identify User Type
+    let userType: UserCategory = 'normal';
+    if (user) {
+      userType = userProfile?.role === 'subscriber' ? 'subscriber' : 'registered';
+    }
+
+    console.log("Submitting Booking | User Type:", userType);
+
     const orderData = {
       userId: user?.uid || null,
+      userType: userType,
       userName: formData.name,
       userPhone: formData.phone,
       address: `Guests: ${formData.guests} | Time: ${formData.date}`,
       itemName: `${formData.type === 'table_booking' ? 'Table' : 'Cabin'} for ${formData.guests}`,
       orderType: formData.type,
-      orderAmount: 0, // Reservations are typically free unless you have a deposit logic
+      orderAmount: 0,
       quantity: parseInt(formData.guests.toString()),
       status: 'pending',
       pointsEarned: 0,
@@ -45,7 +67,7 @@ const Reservation: React.FC<ReservationProps> = ({ whatsappNumber }) => {
     try {
       const docRef = await addDoc(collection(db, "orders"), orderData);
       
-      const whatsappMsg = `*NEW BOOKING - Chef's Jalsa*\n` +
+      const whatsappMsg = `*NEW BOOKING (${userType.toUpperCase()}) - Chef's Jalsa*\n` +
                           `*ID:* ${docRef.id}\n` +
                           `*Type:* ${formData.type.replace('_', ' ').toUpperCase()}\n` +
                           `*For:* ${formData.guests} People\n` +
