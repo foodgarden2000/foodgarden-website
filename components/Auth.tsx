@@ -4,7 +4,10 @@ import { auth, db } from '../firebase';
 import { 
   signInWithEmailAndPassword, 
   createUserWithEmailAndPassword,
-  sendPasswordResetEmail
+  sendPasswordResetEmail,
+  GoogleAuthProvider,
+  signInWithPopup,
+  signOut
 } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
 import { 
   doc, 
@@ -14,11 +17,12 @@ import {
   where,
   limit,
   getDocs,
+  getDoc,
   writeBatch,
   increment
 } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 import { Mail, Lock, UserPlus, LogIn, Loader2, AlertCircle, User, Phone, ShieldCheck, Gift, Tag, CheckCircle2 } from 'lucide-react';
-import { RESTAURANT_INFO, REFERRAL_SIGNUP_REWARD } from '../constants';
+import { RESTAURANT_INFO, REFERRAL_SIGNUP_REWARD, getOptimizedImageURL } from '../constants';
 
 interface AuthProps {
   adminOnly?: boolean;
@@ -37,6 +41,7 @@ const Auth: React.FC<AuthProps> = ({ adminOnly = false, externalReferralCode = n
   const [referralCodeInUrl, setReferralCodeInUrl] = useState<string | null>(externalReferralCode);
 
   const ADMIN_EMAIL = 'gardenfood588@gmail.com';
+  const GOOGLE_ICON_URL = "https://drive.google.com/file/d/1FvLW6Jkhbe5IBbrr070mEiVNfTKrwrun/view?usp=drive_link";
 
   useEffect(() => {
     if (!referralCodeInUrl) {
@@ -74,6 +79,48 @@ const Auth: React.FC<AuthProps> = ({ adminOnly = false, externalReferralCode = n
     }
   };
 
+  const handleGoogleAuth = async () => {
+    setLoading(true);
+    setError('');
+    setSuccess('');
+    
+    const provider = new GoogleAuthProvider();
+    try {
+      const result = await signInWithPopup(auth, provider);
+      const user = result.user;
+
+      if (adminOnly && user.email?.toLowerCase() !== ADMIN_EMAIL) {
+         await signOut(auth);
+         throw new Error("Access Denied: This portal is strictly for authorized staff only.");
+      }
+
+      // Sync Firestore profile for new social users
+      const userRef = doc(db, "users", user.uid);
+      const userSnap = await getDoc(userRef);
+
+      if (!userSnap.exists()) {
+        const myReferralCode = generateReferralCode(user.displayName || 'GUEST');
+        await setDoc(userRef, {
+          uid: user.uid,
+          email: user.email,
+          name: user.displayName || 'Google Guest',
+          phone: user.phoneNumber || '',
+          role: "registered",
+          points: 0,
+          referralCode: myReferralCode,
+          referredBy: referralCodeInUrl || null,
+          totalReferrals: 0,
+          firstOrderCompleted: false,
+          createdAt: new Date().toISOString()
+        });
+      }
+    } catch (err: any) {
+      setError(err.message || "Google authentication failed.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -91,7 +138,6 @@ const Auth: React.FC<AuthProps> = ({ adminOnly = false, externalReferralCode = n
         try {
           await signInWithEmailAndPassword(auth, email, password);
         } catch (err: any) {
-          // Display specific error for incorrect credentials
           if (err.code === 'auth/wrong-password' || err.code === 'auth/user-not-found' || err.code === 'auth/invalid-credential') {
             throw new Error("password or Email Incorrect");
           }
@@ -102,7 +148,6 @@ const Auth: React.FC<AuthProps> = ({ adminOnly = false, externalReferralCode = n
         let inviterUid = null;
         let inviterRefCode = referralCodeInUrl?.trim().toUpperCase();
 
-        // Validate Referral Code if present
         if (inviterRefCode) {
           const inviterQuery = query(
             collection(db, "users"),
@@ -114,14 +159,10 @@ const Auth: React.FC<AuthProps> = ({ adminOnly = false, externalReferralCode = n
           if (!inviterSnap.empty) {
             const inviterDoc = inviterSnap.docs[0];
             inviterUid = inviterDoc.id;
-            
-            // Immediate reward for inviter
             batch.update(doc(db, "users", inviterUid), {
               points: increment(REFERRAL_SIGNUP_REWARD),
               totalReferrals: increment(1)
             });
-
-            // Create reward history
             const rewardRef = doc(collection(db, "referralRewards"));
             batch.set(rewardRef, {
               userId: inviterUid,
@@ -138,7 +179,6 @@ const Auth: React.FC<AuthProps> = ({ adminOnly = false, externalReferralCode = n
         try {
           const userCredential = await createUserWithEmailAndPassword(auth, email, password);
           const newUser = userCredential.user;
-          
           const myReferralCode = generateReferralCode(name);
 
           batch.set(doc(db, "users", newUser.uid), {
@@ -157,7 +197,6 @@ const Auth: React.FC<AuthProps> = ({ adminOnly = false, externalReferralCode = n
 
           await batch.commit();
         } catch (err: any) {
-          // Display specific error for existing user
           if (err.code === 'auth/email-already-in-use') {
             throw new Error("user already exists. sign in?");
           }
@@ -192,7 +231,7 @@ const Auth: React.FC<AuthProps> = ({ adminOnly = false, externalReferralCode = n
           {referralCodeInUrl && !isLogin && (
              <div className="mb-6 bg-brand-gold/10 border border-brand-gold/30 p-3 rounded-lg flex items-center gap-3">
                 <Gift className="text-brand-gold" size={20} />
-                <p className="text-brand-gold text-xs font-bold uppercase tracking-widest">Referral code "{referralCodeInUrl}" applied!</p>
+                <p className="text-brand-gold text-xs font-bold uppercase tracking-widest">Referral applied!</p>
              </div>
           )}
 
@@ -232,107 +271,71 @@ const Auth: React.FC<AuthProps> = ({ adminOnly = false, externalReferralCode = n
               <>
                 <div className="relative">
                   <User className="absolute left-3 top-3.5 text-gray-500" size={18} />
-                  <input 
-                    type="text" 
-                    placeholder="Full Name" 
-                    required
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    className="w-full bg-black/40 border border-gray-700 rounded-lg py-3 pl-10 pr-4 text-white focus:border-brand-gold focus:outline-none transition-colors placeholder-gray-600 font-sans"
-                  />
+                  <input type="text" placeholder="Full Name" required value={name} onChange={(e) => setName(e.target.value)} className="w-full bg-black/40 border border-gray-700 rounded-lg py-3 pl-10 pr-4 text-white focus:border-brand-gold focus:outline-none transition-colors font-sans" />
                 </div>
                 <div className="relative">
                   <Phone className="absolute left-3 top-3.5 text-gray-500" size={18} />
-                  <input 
-                    type="tel" 
-                    placeholder="Phone Number" 
-                    required
-                    value={phone}
-                    onChange={(e) => setPhone(e.target.value)}
-                    className="w-full bg-black/40 border border-gray-700 rounded-lg py-3 pl-10 pr-4 text-white focus:border-brand-gold focus:outline-none transition-colors placeholder-gray-600 font-sans"
-                  />
-                </div>
-                <div className="relative">
-                  <Tag className="absolute left-3 top-3.5 text-gray-500" size={18} />
-                  <input 
-                    type="text" 
-                    placeholder="Referral Code (Optional)" 
-                    value={referralCodeInUrl || ''}
-                    onChange={(e) => setReferralCodeInUrl(e.target.value.toUpperCase())}
-                    className="w-full bg-black/40 border border-gray-700 rounded-lg py-3 pl-10 pr-4 text-white focus:border-brand-gold focus:outline-none transition-colors placeholder-gray-600 font-sans uppercase"
-                  />
+                  <input type="tel" placeholder="Phone Number" required value={phone} onChange={(e) => setPhone(e.target.value)} className="w-full bg-black/40 border border-gray-700 rounded-lg py-3 pl-10 pr-4 text-white focus:border-brand-gold focus:outline-none transition-colors font-sans" />
                 </div>
               </>
             )}
+            
             <div className="relative">
               <Mail className="absolute left-3 top-3.5 text-gray-500" size={18} />
-              <input 
-                type="email" 
-                placeholder={adminOnly ? "Staff ID (Email)" : "Email Address"}
-                required
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="w-full bg-black/40 border border-gray-700 rounded-lg py-3 pl-10 pr-4 text-white focus:border-brand-gold focus:outline-none transition-colors placeholder-gray-600 font-sans"
-              />
+              <input type="email" placeholder={adminOnly ? "Staff ID" : "Email Address"} required value={email} onChange={(e) => setEmail(e.target.value)} className="w-full bg-black/40 border border-gray-700 rounded-lg py-3 pl-10 pr-4 text-white focus:border-brand-gold focus:outline-none transition-colors font-sans" />
             </div>
 
             <div className="relative">
               <Lock className="absolute left-3 top-3.5 text-gray-500" size={18} />
-              <input 
-                type="password" 
-                placeholder="Secure Password" 
-                required
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="w-full bg-black/40 border border-gray-700 rounded-lg py-3 pl-10 pr-4 text-white focus:border-brand-gold focus:outline-none transition-colors placeholder-gray-600 font-sans"
-              />
+              <input type="password" placeholder="Password" required value={password} onChange={(e) => setPassword(e.target.value)} className="w-full bg-black/40 border border-gray-700 rounded-lg py-3 pl-10 pr-4 text-white focus:border-brand-gold focus:outline-none transition-colors font-sans" />
             </div>
 
             {isLogin && (
               <div className="text-right">
-                <button 
-                  type="button" 
-                  onClick={handleForgotPassword}
-                  className="text-[10px] text-gray-500 hover:text-brand-gold uppercase tracking-widest font-bold transition-colors"
-                >
-                  Forgot Password?
-                </button>
+                <button type="button" onClick={handleForgotPassword} className="text-[10px] text-gray-500 hover:text-brand-gold uppercase tracking-widest font-bold transition-colors">Forgot Password?</button>
               </div>
             )}
 
             <button 
               type="submit" 
               disabled={loading}
-              className={`w-full py-4 ${adminOnly ? 'bg-brand-red hover:bg-red-700' : 'bg-brand-gold hover:bg-white'} text-white md:${adminOnly ? 'text-white' : 'text-brand-black'} font-bold uppercase tracking-widest transition-all duration-300 rounded-lg shadow-lg flex items-center justify-center gap-2`}
+              className={`w-full py-4 ${adminOnly ? 'bg-brand-red hover:bg-red-700' : 'bg-brand-gold hover:bg-white text-brand-black'} font-bold uppercase tracking-widest transition-all duration-300 rounded-lg shadow-lg flex items-center justify-center gap-2`}
             >
               {loading ? <Loader2 className="animate-spin" size={20} /> : (isLogin ? <LogIn size={20} /> : <UserPlus size={20} />)}
               {adminOnly ? "Staff Login" : (isLogin ? "Sign In" : "Register Now")}
             </button>
           </form>
 
+          {/* Divider */}
+          <div className="relative flex items-center gap-4 my-8">
+            <div className="flex-1 h-px bg-gray-800"></div>
+            <span className="text-[10px] text-gray-600 font-bold uppercase tracking-widest">or</span>
+            <div className="flex-1 h-px bg-gray-800"></div>
+          </div>
+
+          {/* Google Button */}
+          <button 
+            type="button"
+            onClick={handleGoogleAuth}
+            disabled={loading}
+            className="w-full py-4 bg-white border border-gray-200 text-brand-black font-bold uppercase tracking-widest text-[10px] rounded-lg shadow-sm hover:shadow-md transition-all flex items-center justify-center gap-3 disabled:opacity-50"
+          >
+            <img 
+              src={getOptimizedImageURL(GOOGLE_ICON_URL)} 
+              alt="Google" 
+              className="w-5 h-5 object-contain"
+            />
+            Continue with Google
+          </button>
+
           {!adminOnly && (
             <div className="mt-8 text-center">
-              <button 
-                onClick={() => { setIsLogin(!isLogin); setError(''); setSuccess(''); }}
-                className="text-gray-400 text-sm hover:text-brand-gold transition-colors underline underline-offset-4"
-              >
+              <button onClick={() => { setIsLogin(!isLogin); setError(''); setSuccess(''); }} className="text-gray-400 text-sm hover:text-brand-gold transition-colors underline underline-offset-4">
                 {isLogin ? "Don't have an account? Register" : "Already a member? Sign In"}
               </button>
             </div>
           )}
-          
-          {adminOnly && (
-             <p className="mt-6 text-center text-[9px] text-gray-500 uppercase tracking-widest font-bold">
-               Authorized Personnel Only. Unauthorized access is recorded.
-             </p>
-          )}
         </div>
-        
-        {!adminOnly && (
-          <p className="mt-8 text-center text-gray-600 text-xs uppercase tracking-widest">
-            Pure Vegetarian Excellence Since 2014
-          </p>
-        )}
       </div>
     </div>
   );
