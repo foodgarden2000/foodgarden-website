@@ -3,7 +3,8 @@ import React, { useState, useEffect } from 'react';
 import { auth, db } from '../firebase';
 import { 
   signInWithEmailAndPassword, 
-  createUserWithEmailAndPassword 
+  createUserWithEmailAndPassword,
+  sendPasswordResetEmail
 } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
 import { 
   doc, 
@@ -16,7 +17,7 @@ import {
   writeBatch,
   increment
 } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
-import { Mail, Lock, UserPlus, LogIn, Loader2, AlertCircle, User, Phone, ShieldCheck, Gift, Tag } from 'lucide-react';
+import { Mail, Lock, UserPlus, LogIn, Loader2, AlertCircle, User, Phone, ShieldCheck, Gift, Tag, CheckCircle2 } from 'lucide-react';
 import { RESTAURANT_INFO, REFERRAL_SIGNUP_REWARD } from '../constants';
 
 interface AuthProps {
@@ -32,9 +33,10 @@ const Auth: React.FC<AuthProps> = ({ adminOnly = false, externalReferralCode = n
   const [phone, setPhone] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
   const [referralCodeInUrl, setReferralCodeInUrl] = useState<string | null>(externalReferralCode);
 
-  const ADMIN_EMAIL = 'admin@foodgarden.com';
+  const ADMIN_EMAIL = 'gardenfood588@gmail.com';
 
   useEffect(() => {
     if (!referralCodeInUrl) {
@@ -54,10 +56,29 @@ const Auth: React.FC<AuthProps> = ({ adminOnly = false, externalReferralCode = n
     return `${cleanName}-${randomSuffix}`;
   };
 
+  const handleForgotPassword = async () => {
+    if (!email) {
+      setError("Please enter your email address first.");
+      return;
+    }
+    setLoading(true);
+    setError('');
+    setSuccess('');
+    try {
+      await sendPasswordResetEmail(auth, email);
+      setSuccess("Password reset email sent! Please check your inbox.");
+    } catch (err: any) {
+      setError(err.message || "Failed to send reset email.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError('');
+    setSuccess('');
 
     if (adminOnly && email.toLowerCase() !== ADMIN_EMAIL) {
       setError("Access Denied: This portal is strictly for authorized staff only.");
@@ -183,6 +204,13 @@ const Auth: React.FC<AuthProps> = ({ adminOnly = false, externalReferralCode = n
             </div>
           )}
 
+          {success && (
+            <div className="mb-6 p-4 bg-emerald-500/10 border border-emerald-500/50 rounded-lg flex items-start gap-3 text-emerald-400 text-sm">
+              <CheckCircle2 size={18} className="shrink-0" />
+              <span>{success}</span>
+            </div>
+          )}
+
           <form onSubmit={handleAuth} className="space-y-4">
             {!isLogin && !adminOnly && (
               <>
@@ -244,6 +272,18 @@ const Auth: React.FC<AuthProps> = ({ adminOnly = false, externalReferralCode = n
               />
             </div>
 
+            {isLogin && (
+              <div className="text-right">
+                <button 
+                  type="button" 
+                  onClick={handleForgotPassword}
+                  className="text-[10px] text-gray-500 hover:text-brand-gold uppercase tracking-widest font-bold transition-colors"
+                >
+                  Forgot Password?
+                </button>
+              </div>
+            )}
+
             <button 
               type="submit" 
               disabled={loading}
@@ -257,7 +297,7 @@ const Auth: React.FC<AuthProps> = ({ adminOnly = false, externalReferralCode = n
           {!adminOnly && (
             <div className="mt-8 text-center">
               <button 
-                onClick={() => { setIsLogin(!isLogin); setError(''); }}
+                onClick={() => { setIsLogin(!isLogin); setError(''); setSuccess(''); }}
                 className="text-gray-400 text-sm hover:text-brand-gold transition-colors underline underline-offset-4"
               >
                 {isLogin ? "Don't have an account? Register" : "Already a member? Sign In"}
