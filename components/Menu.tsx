@@ -5,7 +5,7 @@ import { collection, onSnapshot, query, orderBy, addDoc, doc } from "https://www
 import { User } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
 import { Utensils, Loader2, ArrowLeft, X, Minus, Plus, Award, ChevronRight, Truck, Coffee, Sofa, Coins, CreditCard, Search as SearchIcon, Star, Zap, Info } from 'lucide-react';
 import { MenuItem, MenuCategory, Order, OrderType, UserProfile, UserCategory, PaymentMode } from '../types';
-import { getOptimizedImageURL } from '../constants';
+import { getOptimizedImageURL, POINTS_PER_RUPEE } from '../constants';
 
 interface MenuProps {
   whatsappNumber: string;
@@ -76,22 +76,19 @@ const Menu: React.FC<MenuProps> = ({ whatsappNumber, user, currentPoints, onNavi
     setIsOrderModalOpen(true);
   };
 
-  const submitOrder = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const submitOrder = async (mode: PaymentMode) => {
     if (!selectedOrderItem || !user) return;
 
     const totalAmount = Number(selectedOrderItem.price) * orderFormData.quantity;
-    const rate = userProfile?.role === 'subscriber' ? 0.15 : 0.10;
-    const potentialPoints = Math.floor(totalAmount * rate);
-    const userType: UserCategory = userProfile?.role === 'subscriber' ? 'subscriber' : 'registered';
+    const requiredRedeemPoints = totalAmount * POINTS_PER_RUPEE;
     
-    // Reverted point redemption logic to standard earn-only or simple deduction
-    const requiredRedeemPoints = totalAmount; // Simplified back to 1:1 or previous logic
-
-    if (selectedPaymentMode === 'points' && (userProfile?.points || 0) < requiredRedeemPoints) {
+    if (mode === 'points' && (userProfile?.points || 0) < requiredRedeemPoints) {
       alert(`Insufficient points! You need ${requiredRedeemPoints} but have ${userProfile?.points || 0}.`);
       return;
     }
+
+    const potentialPoints = mode === 'points' ? 0 : totalAmount * POINTS_PER_RUPEE;
+    const userType: UserCategory = userProfile?.role === 'subscriber' ? 'subscriber' : 'registered';
 
     const orderData: Order = {
       userId: user.uid,
@@ -104,11 +101,11 @@ const Menu: React.FC<MenuProps> = ({ whatsappNumber, user, currentPoints, onNavi
       orderAmount: totalAmount,
       quantity: orderFormData.quantity,
       status: 'pending',
-      paymentMode: selectedPaymentMode,
-      pointsUsed: selectedPaymentMode === 'points' ? requiredRedeemPoints : 0,
-      amountEquivalent: selectedPaymentMode === 'points' ? totalAmount : 0,
+      paymentMode: mode,
+      pointsUsed: mode === 'points' ? requiredRedeemPoints : 0,
+      amountEquivalent: mode === 'points' ? totalAmount : 0,
       pointsDeducted: false,
-      pointsEarned: selectedPaymentMode === 'points' ? 0 : potentialPoints,
+      pointsEarned: potentialPoints,
       pointsCredited: false,
       notes: orderFormData.notes,
       createdAt: new Date().toISOString()
@@ -116,17 +113,17 @@ const Menu: React.FC<MenuProps> = ({ whatsappNumber, user, currentPoints, onNavi
 
     try {
       const docRef = await addDoc(collection(db, "orders"), orderData);
-      const message = `*NEW ORDER - ${orderFormData.type.replace('_', ' ').toUpperCase()}*\n` +
+      const message = `*NEW ORDER (${mode.toUpperCase()}) - Chef's Jalsa*\n` +
                       `*ID:* ${docRef.id}\n` +
                       `*Item:* ${selectedOrderItem.itemName}\n` +
                       `*Qty:* ${orderFormData.quantity}\n` +
                       `*Total:* ₹${totalAmount}\n` +
-                      `*Mode:* ${selectedPaymentMode.toUpperCase()}\n` +
+                      (mode === 'points' ? `*Points Used:* ${requiredRedeemPoints}\n` : '') +
                       `*Name:* ${orderFormData.name}\n*Phone:* ${orderFormData.phone}`;
 
       window.open(`https://wa.me/${whatsappNumber}?text=${encodeURIComponent(message)}`, '_blank');
       setIsOrderModalOpen(false);
-      alert("Order submitted! Track in dashboard.");
+      alert("Order submitted! You can track status in your dashboard.");
     } catch (err) { alert("Error processing order."); }
   };
 
@@ -137,7 +134,7 @@ const Menu: React.FC<MenuProps> = ({ whatsappNumber, user, currentPoints, onNavi
   );
 
   return (
-    <section id="menu" className="py-24 bg-white min-h-screen relative">
+    <section id="menu" className="py-24 bg-white min-h-screen relative text-brand-black">
       <div className="container mx-auto px-4 md:px-8">
         
         {/* Loyalty Card */}
@@ -147,7 +144,7 @@ const Menu: React.FC<MenuProps> = ({ whatsappNumber, user, currentPoints, onNavi
                 <div className="w-16 h-16 bg-brand-gold/20 rounded-full flex items-center justify-center text-brand-gold"><Award size={36} /></div>
                 <div>
                    <h4 className="text-white font-display text-xl tracking-widest uppercase">Member Privilege</h4>
-                   <p className="text-gray-400 text-sm uppercase font-bold tracking-widest mt-1">Earn {userProfile?.role === 'subscriber' ? '15%' : '10%'} Bonus Points</p>
+                   <p className="text-gray-400 text-sm uppercase font-bold tracking-widest mt-1">Order using Points or Earn Rewards</p>
                 </div>
              </div>
              <div className="text-center md:text-right">
@@ -181,7 +178,6 @@ const Menu: React.FC<MenuProps> = ({ whatsappNumber, user, currentPoints, onNavi
         </div>
 
         {!activeCategory && !searchQuery ? (
-          /* Category Browsing Mode */
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-10">
             {categories.map(cat => (
               <div 
@@ -208,7 +204,6 @@ const Menu: React.FC<MenuProps> = ({ whatsappNumber, user, currentPoints, onNavi
             ))}
           </div>
         ) : (
-          /* Items Listing Mode */
           <div className="animate-fade-in">
             <button 
               onClick={() => { setActiveCategory(null); setSearchQuery(''); }} 
@@ -219,7 +214,7 @@ const Menu: React.FC<MenuProps> = ({ whatsappNumber, user, currentPoints, onNavi
             
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
               {filteredItems.map((item, idx) => (
-                <div key={idx} className="bg-white border border-gray-100 rounded-3xl overflow-hidden shadow-sm hover:shadow-2xl transition-all duration-500 flex flex-col animate-fade-in-up" style={{ animationDelay: `${idx * 0.05}s` }}>
+                <div key={idx} className="bg-white border border-gray-100 rounded-3xl overflow-hidden shadow-sm hover:shadow-2xl transition-all duration-500 flex flex-col animate-fade-in-up">
                   <div className="h-64 relative overflow-hidden">
                     <img 
                       src={getOptimizedImageURL(item.itemImageURL)} 
@@ -253,18 +248,11 @@ const Menu: React.FC<MenuProps> = ({ whatsappNumber, user, currentPoints, onNavi
                   </div>
                 </div>
               ))}
-              {filteredItems.length === 0 && (
-                <div className="col-span-full py-32 text-center border-2 border-dashed border-gray-100 rounded-3xl flex flex-col items-center gap-6">
-                   <Info className="text-gray-200" size={64} />
-                   <p className="text-gray-400 font-serif italic text-xl">No dishes match your specific preference right now.</p>
-                </div>
-              )}
             </div>
           </div>
         )}
       </div>
 
-      {/* Checkout Modal */}
       {isOrderModalOpen && selectedOrderItem && user && (
         <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/95 backdrop-blur-md animate-fade-in">
           <div className="bg-white rounded-3xl w-full max-w-lg overflow-hidden animate-fade-in-up shadow-2xl flex flex-col max-h-[95vh]">
@@ -276,7 +264,7 @@ const Menu: React.FC<MenuProps> = ({ whatsappNumber, user, currentPoints, onNavi
               <button onClick={() => setIsOrderModalOpen(false)} className="p-2 hover:bg-white/10 rounded-full transition-colors"><X size={28} /></button>
             </div>
             
-            <form onSubmit={submitOrder} className="p-8 space-y-8 overflow-y-auto">
+            <div className="p-8 space-y-8 overflow-y-auto">
               <div className="grid grid-cols-3 gap-4">
                 {[
                   { id: 'delivery', label: 'Delivery', icon: Truck },
@@ -310,24 +298,38 @@ const Menu: React.FC<MenuProps> = ({ whatsappNumber, user, currentPoints, onNavi
               <div className="space-y-5">
                 <input type="text" placeholder="Full Name" required value={orderFormData.name} className="w-full p-5 bg-gray-50 border border-gray-200 rounded-2xl focus:border-brand-gold outline-none font-sans" onChange={e => setOrderFormData({...orderFormData, name: e.target.value})} />
                 <input type="tel" placeholder="WhatsApp Contact" required value={orderFormData.phone} className="w-full p-5 bg-gray-50 border border-gray-200 rounded-2xl focus:border-brand-gold outline-none font-sans" onChange={e => setOrderFormData({...orderFormData, phone: e.target.value})} />
-                <textarea placeholder={orderFormData.type === 'delivery' ? "Precise Delivery Address" : "Dining Preference (Near Window, AC, etc)"} required value={orderFormData.address} className="w-full p-5 bg-gray-50 border border-gray-200 rounded-2xl focus:border-brand-gold outline-none h-28 resize-none font-sans" onChange={e => setOrderFormData({...orderFormData, address: e.target.value})} />
+                <textarea placeholder={orderFormData.type === 'delivery' ? "Precise Delivery Address" : "Dining Preference"} required value={orderFormData.address} className="w-full p-5 bg-gray-50 border border-gray-200 rounded-2xl focus:border-brand-gold outline-none h-28 resize-none font-sans" onChange={e => setOrderFormData({...orderFormData, address: e.target.value})} />
               </div>
 
-              <div className="bg-brand-black p-6 rounded-2xl border border-brand-gold/20 flex items-center justify-between shadow-lg">
-                <div>
-                   <span className="text-[10px] text-gray-500 uppercase font-bold tracking-widest block mb-1">Estimated Total</span>
-                   <span className="text-3xl font-display font-bold text-brand-gold">₹{getCleanPrice(selectedOrderItem) * orderFormData.quantity}</span>
+              <div className="bg-brand-black p-6 rounded-2xl border border-brand-gold/20 flex flex-col gap-4 shadow-lg">
+                <div className="flex justify-between items-center">
+                   <div>
+                      <span className="text-[10px] text-gray-500 uppercase font-bold tracking-widest block mb-1">Estimated Total</span>
+                      <span className="text-3xl font-display font-bold text-brand-gold">₹{getCleanPrice(selectedOrderItem) * orderFormData.quantity}</span>
+                   </div>
+                   <div className="text-right">
+                      <span className="text-[10px] text-gray-500 uppercase font-bold tracking-widest block mb-1">Points Value</span>
+                      <span className="text-xl font-display font-bold text-brand-red">{getCleanPrice(selectedOrderItem) * orderFormData.quantity * POINTS_PER_RUPEE} Pts</span>
+                   </div>
                 </div>
-                <div className="text-right">
-                   <span className="text-[10px] text-gray-500 uppercase font-bold tracking-widest block mb-1">Rewards To Earn</span>
-                   <span className="text-xl font-display font-bold text-brand-red">+{Math.floor(getCleanPrice(selectedOrderItem) * orderFormData.quantity * (userProfile?.role === 'subscriber' ? 0.15 : 0.10))} Pts</span>
+
+                <div className="grid grid-cols-2 gap-4 pt-4 border-t border-white/5">
+                  <button 
+                    onClick={() => submitOrder('cash')}
+                    className="py-4 bg-white text-brand-black font-bold uppercase tracking-widest text-[10px] rounded-xl flex items-center justify-center gap-2 hover:bg-brand-gold transition-all"
+                  >
+                    <CreditCard size={14} /> Pay Money
+                  </button>
+                  <button 
+                    disabled={(userProfile?.points || 0) < (getCleanPrice(selectedOrderItem) * orderFormData.quantity * POINTS_PER_RUPEE)}
+                    onClick={() => submitOrder('points')}
+                    className="py-4 bg-brand-gold text-brand-black font-bold uppercase tracking-widest text-[10px] rounded-xl flex items-center justify-center gap-2 disabled:opacity-30 disabled:grayscale hover:bg-white transition-all"
+                  >
+                    <Coins size={14} /> Pay Points
+                  </button>
                 </div>
               </div>
-
-              <button type="submit" className="w-full py-6 bg-brand-gold text-brand-black font-bold uppercase tracking-[0.3em] text-xs rounded-2xl shadow-2xl hover:bg-brand-black hover:text-white transition-all transform active:scale-95">
-                Confirm & Place Order
-              </button>
-            </form>
+            </div>
           </div>
         </div>
       )}

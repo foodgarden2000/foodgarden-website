@@ -18,10 +18,10 @@ import {
   getDoc
 } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 import { 
-  Trash2, Utensils, ShoppingBag, Clock, CheckCircle2, XCircle, LogOut, Truck, Sofa, Coffee, Check, Zap, User, Star, X, Search as SearchIcon, Edit3, Eye, EyeOff, Package, MapPin, Volume2, VolumeX, Smartphone, Tag, Phone, CreditCard, Calendar, ShieldCheck, AlertCircle, PartyPopper, Cake, Users, Gift, ArrowRight
+  Trash2, Utensils, ShoppingBag, Clock, CheckCircle2, XCircle, LogOut, Truck, Sofa, Coffee, Check, Zap, User, Star, X, Search as SearchIcon, Edit3, Eye, EyeOff, Package, MapPin, Volume2, VolumeX, Smartphone, Tag, Phone, CreditCard, Calendar, ShieldCheck, AlertCircle, PartyPopper, Cake, Users, Gift, ArrowRight, Coins
 } from 'lucide-react';
-import { MenuItem, MenuCategory, Order, OrderStatus, UserProfile } from '../types';
-import { getOptimizedImageURL, FIRST_ORDER_REWARD_INVITER, FIRST_ORDER_REWARD_REFERRED_USER } from '../constants';
+import { MenuItem, MenuCategory, Order, OrderStatus, UserProfile, PointTransaction } from '../types';
+import { getOptimizedImageURL, FIRST_ORDER_REWARD_INVITER, FIRST_ORDER_REWARD_REFERRED_USER, POINTS_PER_RUPEE } from '../constants';
 import AdminMenu from './AdminMenu'; // Import the new Menu Manager
 
 interface AdminDashboardProps {
@@ -144,18 +144,62 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
       const orderRef = doc(db, "orders", order.id);
       batch.update(orderRef, updateData);
 
+      // --- POINT SYSTEM LOGIC UPON DELIVERY ---
       if (newStatus === 'delivered' && order.userId) {
         const userRef = doc(db, "users", order.userId);
         const userSnap = await getDoc(userRef);
         
         if (userSnap.exists()) {
           const userData = userSnap.data() as UserProfile;
+          const currentPointsHistory = userData.pointsHistory || [];
+
+          if (order.paymentMode === 'points' && !order.pointsDeducted) {
+            // Deduct Points
+            const spentTx: PointTransaction = {
+              type: 'spent',
+              amount: order.pointsUsed,
+              via: 'order',
+              date: new Date().toISOString(),
+              orderId: order.id
+            };
+            batch.update(userRef, {
+              points: increment(-order.pointsUsed),
+              pointsHistory: [spentTx, ...currentPointsHistory.slice(0, 99)]
+            });
+            batch.update(orderRef, { pointsDeducted: true });
+          } else if (order.paymentMode !== 'points' && !order.pointsCredited) {
+            // Earn Points (1 INR = 2 Pts)
+            const earnedPoints = order.orderAmount * POINTS_PER_RUPEE;
+            const earnedTx: PointTransaction = {
+              type: 'earned',
+              amount: earnedPoints,
+              via: 'order',
+              date: new Date().toISOString(),
+              orderId: order.id
+            };
+            batch.update(userRef, {
+              points: increment(earnedPoints),
+              pointsHistory: [earnedTx, ...currentPointsHistory.slice(0, 99)]
+            });
+            batch.update(orderRef, { pointsCredited: true });
+          }
+
+          // Referral Reward System Logic (Only if it's the 1st order)
           if (!userData.firstOrderCompleted) {
+            // First Order Completion Bonus for the user
+            const firstOrderTx: PointTransaction = {
+              type: 'earned',
+              amount: FIRST_ORDER_REWARD_REFERRED_USER,
+              via: 'bonus',
+              date: new Date().toISOString()
+            };
             batch.update(userRef, {
               points: increment(FIRST_ORDER_REWARD_REFERRED_USER),
-              firstOrderCompleted: true
+              firstOrderCompleted: true,
+              pointsHistory: [firstOrderTx, ...currentPointsHistory.slice(0, 99)]
             });
 
+            // Reward History Log
             const userRewardLog = doc(collection(db, "referralRewards"));
             batch.set(userRewardLog, {
               userId: order.userId,
@@ -169,8 +213,23 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
               const inviterQuery = query(collection(db, "users"), where("referralCode", "==", userData.referredBy), limit(1));
               const inviterSnap = await getDocs(inviterQuery);
               if (!inviterSnap.empty) {
-                const inviterUid = inviterSnap.docs[0].id;
-                batch.update(doc(db, "users", inviterUid), { points: increment(FIRST_ORDER_REWARD_INVITER) });
+                const inviterDoc = inviterSnap.docs[0];
+                const inviterUid = inviterDoc.id;
+                const inviterData = inviterDoc.data() as UserProfile;
+                const inviterHistory = inviterData.pointsHistory || [];
+
+                const inviterTx: PointTransaction = {
+                  type: 'earned',
+                  amount: FIRST_ORDER_REWARD_INVITER,
+                  via: 'referral',
+                  date: new Date().toISOString()
+                };
+                
+                batch.update(doc(db, "users", inviterUid), { 
+                  points: increment(FIRST_ORDER_REWARD_INVITER),
+                  pointsHistory: [inviterTx, ...inviterHistory.slice(0, 99)]
+                });
+
                 const inviterRewardLog = doc(collection(db, "referralRewards"));
                 batch.set(inviterRewardLog, {
                   userId: inviterUid,
@@ -370,6 +429,11 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
                           <span className={`px-3 py-1 rounded border flex items-center gap-1.5 text-[9px] font-bold uppercase tracking-widest ${typeBadge.color}`}>
                             <typeBadge.icon size={12} /> {typeBadge.label}
                           </span>
+                          {order.paymentMode === 'points' && (
+                            <span className="px-3 py-1 rounded border border-brand-red/30 bg-brand-red/10 text-brand-red text-[9px] font-bold uppercase tracking-widest flex items-center gap-1">
+                              <Coins size={10} /> POINT ORDER
+                            </span>
+                          )}
                           <span className="text-[10px] text-gray-500 font-medium">#{order.id.slice(-6).toUpperCase()}</span>
                           <span className="ml-auto lg:ml-0 text-[10px] text-brand-gold/60 font-bold bg-brand-gold/5 px-2 py-0.5 rounded border border-brand-gold/10">
                             {getTimeElapsed(order.createdAt)}
@@ -386,7 +450,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
                               <span className="flex items-center gap-1.5 font-medium"><Smartphone size={14} className="text-brand-gold" /> {order.userPhone || 'N/A'}</span>
                             </div>
                             <div className="mt-4 p-4 bg-black/20 rounded-2xl border border-white/5">
-                              <p className="text-[10px] text-gray-500 uppercase font-bold tracking-widest">Context</p>
+                              <p className="text-[10px] text-gray-500 uppercase font-bold tracking-widest">Customer Details</p>
                               <p className="text-xs text-gray-300 italic">{order.address || 'No details provided'}</p>
                             </div>
                           </div>
@@ -394,7 +458,9 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
                       </div>
                       <div className="flex flex-col md:flex-row lg:flex-col items-center lg:items-end gap-6 pt-6 lg:pt-0 border-t lg:border-t-0 border-white/5">
                         <div className="text-center lg:text-right">
-                          <p className="text-[10px] text-gray-600 font-bold uppercase tracking-widest mb-1">VALUE</p>
+                          <p className="text-[10px] text-gray-600 font-bold uppercase tracking-widest mb-1">
+                            {order.paymentMode === 'points' ? 'POINTS SPENT' : 'ORDER VALUE'}
+                          </p>
                           <p className="text-3xl font-display font-bold text-brand-gold">
                             {order.paymentMode === 'points' ? `${order.pointsUsed || 0} Pts` : `₹${order.orderAmount || 0}`}
                           </p>
@@ -501,16 +567,44 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
         <div className="fixed inset-0 z-[150] bg-black/95 backdrop-blur-md flex items-center justify-center p-4">
           <div className="bg-brand-dark border border-brand-gold/30 rounded-3xl p-8 w-full max-w-2xl shadow-2xl animate-fade-in-up flex flex-col max-h-[90vh]">
             <div className="flex justify-between items-center mb-8 border-b border-white/5 pb-4">
-               <div><h3 className="text-2xl font-display font-bold text-white uppercase tracking-widest">Reward Ledger</h3><p className="text-[10px] text-gray-500 uppercase tracking-widest mt-1">{selectedReferralUser.name}</p></div>
+               <div><h3 className="text-2xl font-display font-bold text-white uppercase tracking-widest">User Details</h3><p className="text-[10px] text-gray-500 uppercase tracking-widest mt-1">{selectedReferralUser.name}</p></div>
                <button onClick={() => setSelectedReferralUser(null)} className="text-gray-500 hover:text-white transition-colors"><X size={24} /></button>
             </div>
             <div className="flex-1 overflow-y-auto space-y-4 pr-2">
-              {referralHistory.map(reward => (
-                <div key={reward.id} className="p-4 bg-black/40 border border-white/5 rounded-2xl flex items-center justify-between">
-                  <div className="flex items-center gap-4"><div className="w-10 h-10 rounded-full bg-brand-gold/10 flex items-center justify-center text-brand-gold"><Gift size={18} /></div><div><p className="text-white font-bold capitalize">{reward.type} Reward</p><p className="text-[9px] text-gray-600 uppercase tracking-widest">{new Date(reward.timestamp).toLocaleDateString()}</p></div></div>
-                  <div className="text-right"><p className="text-brand-gold font-bold">+{reward.pointsEarned} Pts</p></div>
+              <div className="grid grid-cols-2 gap-4 mb-6">
+                <div className="bg-black/40 p-4 rounded-xl border border-white/5">
+                  <p className="text-[10px] text-gray-500 uppercase font-bold tracking-widest mb-1">Total Points</p>
+                  <p className="text-2xl font-bold text-brand-gold">{selectedReferralUser.points || 0}</p>
                 </div>
-              ))}
+                <div className="bg-black/40 p-4 rounded-xl border border-white/5">
+                  <p className="text-[10px] text-gray-500 uppercase font-bold tracking-widest mb-1">Referrals</p>
+                  <p className="text-2xl font-bold text-brand-gold">{selectedReferralUser.totalReferrals || 0}</p>
+                </div>
+              </div>
+
+              <h4 className="text-white font-bold uppercase text-[10px] tracking-widest mb-4">Transaction Ledger</h4>
+              {selectedReferralUser.pointsHistory && selectedReferralUser.pointsHistory.length > 0 ? (
+                selectedReferralUser.pointsHistory.map((reward, idx) => (
+                  <div key={idx} className="p-4 bg-black/40 border border-white/5 rounded-2xl flex items-center justify-between">
+                    <div className="flex items-center gap-4">
+                      <div className={`w-10 h-10 rounded-full flex items-center justify-center ${reward.type === 'earned' ? 'bg-emerald-500/10 text-emerald-500' : 'bg-rose-500/10 text-rose-500'}`}>
+                        {reward.type === 'earned' ? <ArrowRight size={18} /> : <Zap size={18} />}
+                      </div>
+                      <div>
+                        <p className="text-white font-bold capitalize">{reward.via} {reward.type}</p>
+                        <p className="text-[9px] text-gray-600 uppercase tracking-widest">{new Date(reward.date).toLocaleString()}</p>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <p className={`font-bold ${reward.type === 'earned' ? 'text-emerald-500' : 'text-rose-500'}`}>
+                        {reward.type === 'earned' ? '+' : '-'}{reward.amount} Pts
+                      </p>
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <div className="py-12 text-center text-gray-600 italic">No transactions found.</div>
+              )}
             </div>
           </div>
         </div>

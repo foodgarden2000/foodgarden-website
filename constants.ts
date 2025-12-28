@@ -11,7 +11,8 @@ export const RESTAURANT_INFO = {
   mapLink: "https://www.google.com/maps/search/Chef's+Jalsa+Jhumri+Telaiya"
 };
 
-// Referral Constants
+// Point & Referral Constants
+export const POINTS_PER_RUPEE = 2;
 export const REFERRAL_SIGNUP_REWARD = 50; // Points to inviter on valid signup
 export const FIRST_ORDER_REWARD_REFERRED_USER = 30; // Points to new user on 1st order
 export const FIRST_ORDER_REWARD_INVITER = 30; // Points to inviter on new user's 1st order
@@ -47,18 +48,18 @@ export const SERVICES_DATA: Record<string, string[]> = {
 
 // Fixed MENU_ITEMS to satisfy the MenuItem interface requirements
 export const MENU_ITEMS: MenuItem[] = [
-  { itemName: "Veg Noodles", description: "Stir-fried noodles with fresh vegetables and aromatic sauces.", categoryId: "Chinese", itemType: "veg", price: "₹120", itemImageURL: "", recommended: false, available: true },
-  { itemName: "Manchurian", description: "Vegetable balls tossed in spicy and tangy soya sauce.", categoryId: "Chinese", itemType: "veg", price: "₹140", itemImageURL: "", recommended: false, available: true },
-  { itemName: "Veg Burger", description: "Crispy patty with fresh lettuce, tomato, and house special dressing.", categoryId: "Snacks", itemType: "snacks", price: "₹80", itemImageURL: "", recommended: false, available: true },
-  { itemName: "Pizza Pocket", description: "Golden fried pockets stuffed with cheese and pizza veggies.", categoryId: "Snacks", itemType: "snacks", price: "₹90", itemImageURL: "", recommended: false, available: true },
-  { itemName: "French Fries", description: "Classic salted crispy potato fries.", categoryId: "Snacks", itemType: "snacks", price: "₹70", itemImageURL: "", recommended: false, available: true },
-  { itemName: "Potali Samosa", description: "Unique potali-shaped samosas with rich spicy filling.", categoryId: "Snacks", itemType: "snacks", price: "₹40", itemImageURL: "", recommended: false, available: true },
-  { itemName: "Soup of the Day", description: "Chef's special fresh vegetable soup.", categoryId: "Chinese", itemType: "veg", price: "₹90", itemImageURL: "", recommended: false, available: true },
-  { itemName: "Paneer Butter Masala", description: "Cottage cheese cubes in rich tomato and cashew gravy.", categoryId: "Indian", itemType: "veg", price: "₹220", itemImageURL: "", recommended: false, available: true },
-  { itemName: "Dal Tadka", description: "Yellow lentils tempered with ghee, cumin, and garlic.", categoryId: "Indian", itemType: "veg", price: "₹160", itemImageURL: "", recommended: false, available: true },
-  { itemName: "Butter Naan", description: "Soft tandoori bread topped with butter.", categoryId: "Indian", itemType: "veg", price: "₹45", itemImageURL: "", recommended: false, available: true },
-  { itemName: "Gulab Jamun & Ice-Cream", description: "Hot gulab jamun paired with vanilla ice cream.", categoryId: "Desserts", itemType: "dessert", price: "₹90", itemImageURL: "", recommended: false, available: true },
-  { itemName: "Sizzling Brownie", description: "Walnut brownie with chocolate sauce on a hot plate.", categoryId: "Desserts", itemType: "dessert", price: "₹150", itemImageURL: "", recommended: false, available: true },
+  { itemName: "Veg Noodles", description: "Stir-fried noodles with fresh vegetables and aromatic sauces.", categoryId: "Chinese", itemType: "veg", price: "120", itemImageURL: "", recommended: false, available: true },
+  { itemName: "Manchurian", description: "Vegetable balls tossed in spicy and tangy soya sauce.", categoryId: "Chinese", itemType: "veg", price: "140", itemImageURL: "", recommended: false, available: true },
+  { itemName: "Veg Burger", description: "Crispy patty with fresh lettuce, tomato, and house special dressing.", categoryId: "Snacks", itemType: "snacks", price: "80", itemImageURL: "", recommended: false, available: true },
+  { itemName: "Pizza Pocket", description: "Golden fried pockets stuffed with cheese and pizza veggies.", categoryId: "Snacks", itemType: "snacks", price: "90", itemImageURL: "", recommended: false, available: true },
+  { itemName: "French Fries", description: "Classic salted crispy potato fries.", categoryId: "Snacks", itemType: "snacks", price: "70", itemImageURL: "", recommended: false, available: true },
+  { itemName: "Potali Samosa", description: "Unique potali-shaped samosas with rich spicy filling.", categoryId: "Snacks", itemType: "snacks", price: "40", itemImageURL: "", recommended: false, available: true },
+  { itemName: "Soup of the Day", description: "Chef's special fresh vegetable soup.", categoryId: "Chinese", itemType: "veg", price: "90", itemImageURL: "", recommended: false, available: true },
+  { itemName: "Paneer Butter Masala", description: "Cottage cheese cubes in rich tomato and cashew gravy.", categoryId: "Indian", itemType: "veg", price: "220", itemImageURL: "", recommended: false, available: true },
+  { itemName: "Dal Tadka", description: "Yellow lentils tempered with ghee, cumin, and garlic.", categoryId: "Indian", itemType: "veg", price: "160", itemImageURL: "", recommended: false, available: true },
+  { itemName: "Butter Naan", description: "Soft tandoori bread topped with butter.", categoryId: "Indian", itemType: "veg", price: "45", itemImageURL: "", recommended: false, available: true },
+  { itemName: "Gulab Jamun & Ice-Cream", description: "Hot gulab jamun paired with vanilla ice cream.", categoryId: "Desserts", itemType: "dessert", price: "90", itemImageURL: "", recommended: false, available: true },
+  { itemName: "Sizzling Brownie", description: "Walnut brownie with chocolate sauce on a hot plate.", categoryId: "Desserts", itemType: "dessert", price: "150", itemImageURL: "", recommended: false, available: true },
 ];
 
 export const FESTIVAL_SPECIALS: FestivalSpecial[] = [

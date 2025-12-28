@@ -4,7 +4,7 @@ import { User as FirebaseUser, signOut } from "https://www.gstatic.com/firebasej
 import { auth, db } from '../firebase';
 import Auth from './Auth';
 import { 
-  User, ShoppingBag, Clock, ShieldCheck, Zap, Ban, Package, Tag, Coins, Loader2, Gift, Share2, Copy, CheckCircle2, Users
+  User, ShoppingBag, Clock, ShieldCheck, Zap, Ban, Package, Tag, Coins, Loader2, Gift, Share2, Copy, CheckCircle2, Users, ArrowUpRight, ArrowDownLeft
 } from 'lucide-react';
 import { 
   doc, 
@@ -90,7 +90,6 @@ const Dashboard: React.FC<DashboardProps> = ({ user, points, adminOnlyRequest, r
 
   const getReferralLink = () => {
     if (!profile?.referralCode) return '';
-    // Ensure trailing slash before query param to prevent 404s on SPA hosts
     const origin = window.location.origin.endsWith('/') ? window.location.origin : `${window.location.origin}/`;
     return `${origin}?ref=${profile.referralCode}`;
   };
@@ -194,23 +193,26 @@ const Dashboard: React.FC<DashboardProps> = ({ user, points, adminOnlyRequest, r
                             <span className={`text-[10px] uppercase font-bold px-3 py-1 rounded-full border ${statusInfo.color}`}>
                               {statusInfo.label}
                             </span>
+                            {order.paymentMode === 'points' && (
+                              <span className="text-[10px] uppercase font-bold px-3 py-1 rounded-full bg-brand-red/10 text-brand-red border border-brand-red/20 flex items-center gap-1">
+                                <Coins size={10} /> POINT ORDER
+                              </span>
+                            )}
                           </div>
                           <div className="flex flex-wrap items-center gap-4 text-xs text-gray-400">
                              <span className="flex items-center gap-1.5 font-bold uppercase tracking-wider"><Clock size={14} className="text-brand-gold" /> {new Date(order.createdAt).toLocaleDateString()}</span>
                              <span className="flex items-center gap-1.5 font-bold uppercase tracking-wider"><Tag size={14} className="text-brand-gold" /> {(order.orderType || '').replace(/_/g, ' ')}</span>
                           </div>
-                          {order.rejectReason && (
-                            <div className="mt-4 p-4 bg-rose-50 border border-rose-100 rounded-2xl">
-                              <p className="text-[10px] text-rose-500 font-bold uppercase tracking-widest mb-1">Update from Kitchen</p>
-                              <p className="text-sm text-rose-800 italic">"{order.rejectReason}"</p>
-                            </div>
-                          )}
                         </div>
                       </div>
                       <div className="flex flex-col items-end justify-between gap-4">
                         <div className="text-right">
-                          <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mb-1">Order Total</p>
-                          <p className="text-3xl font-display font-bold text-brand-black">₹{order.orderAmount || 0}</p>
+                          <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mb-1">
+                            {order.paymentMode === 'points' ? 'POINTS SPENT' : 'ORDER TOTAL'}
+                          </p>
+                          <p className="text-3xl font-display font-bold text-brand-black">
+                            {order.paymentMode === 'points' ? `${order.pointsUsed} Pts` : `₹${order.orderAmount || 0}`}
+                          </p>
                         </div>
                         {canCancel && (
                           <button 
@@ -234,11 +236,10 @@ const Dashboard: React.FC<DashboardProps> = ({ user, points, adminOnlyRequest, r
              <div className="bg-white p-8 md:p-12 rounded-[2rem] shadow-xl border border-gray-100">
                 <div className="flex flex-col md:flex-row items-center justify-between gap-8 mb-12">
                    <div className="text-center md:text-left">
-                      <h3 className="text-gray-400 text-xs font-bold uppercase tracking-widest mb-2">Current Balance</h3>
+                      <h3 className="text-gray-400 text-xs font-bold uppercase tracking-widest mb-2">Available Points</h3>
                       <div className="flex items-center justify-center md:justify-start gap-4">
                         <Coins className="text-brand-gold" size={48} />
                         <span className="text-6xl font-display font-bold text-brand-black">{profile?.points || 0}</span>
-                        <span className="text-brand-gold font-bold uppercase text-xs tracking-widest self-end pb-2">Points</span>
                       </div>
                    </div>
                    <div className="bg-brand-dark p-6 rounded-2xl border-2 border-brand-gold/30 flex flex-col items-center">
@@ -246,49 +247,65 @@ const Dashboard: React.FC<DashboardProps> = ({ user, points, adminOnlyRequest, r
                         <Users size={20} />
                         <span className="text-2xl font-bold">{profile?.totalReferrals || 0}</span>
                       </div>
-                      <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">Total Successful Referrals</p>
+                      <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">Referrals Joined</p>
                    </div>
                 </div>
 
-                <div className="bg-brand-cream/50 p-8 rounded-3xl border border-brand-gold/10">
-                   <div className="flex flex-col items-center text-center">
-                      <div className="w-12 h-12 bg-brand-gold/10 rounded-full flex items-center justify-center text-brand-gold mb-4">
-                        <Gift size={24} />
-                      </div>
-                      <h4 className="text-brand-black font-bold uppercase tracking-widest text-sm mb-2">My Exclusive Referral Code</h4>
-                      <p className="text-gray-500 text-xs mb-8">Invite your friends and earn points on their signup and 1st order!</p>
-                      
-                      <div className="flex items-center gap-4 w-full max-w-sm">
-                         <div className="flex-1 bg-white border-2 border-dashed border-brand-gold/30 p-4 rounded-xl text-center font-display font-bold text-2xl tracking-widest text-brand-black">
-                            {profile?.referralCode || '----'}
-                         </div>
-                         <button 
-                          onClick={copyReferral}
-                          className="p-4 bg-brand-dark text-white rounded-xl hover:bg-brand-gold hover:text-brand-black transition-all shadow-lg active:scale-95"
-                          title="Copy Link"
-                         >
-                            {copySuccess ? <CheckCircle2 className="text-emerald-400" /> : <Copy />}
-                         </button>
-                      </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
+                  <div className="space-y-6">
+                    <h4 className="text-brand-black font-bold uppercase tracking-widest text-xs border-b border-gray-100 pb-2">Loyalty Rules</h4>
+                    <div className="space-y-4">
+                       <div className="flex items-start gap-4">
+                          <div className="w-8 h-8 rounded-full bg-emerald-500/10 text-emerald-600 flex items-center justify-center shrink-0"><Zap size={16}/></div>
+                          <p className="text-xs text-gray-500">Every ₹1 spent on cash/UPI orders earns you <span className="text-brand-black font-bold">2 Points</span> after delivery.</p>
+                       </div>
+                       <div className="flex items-start gap-4">
+                          <div className="w-8 h-8 rounded-full bg-blue-500/10 text-blue-600 flex items-center justify-center shrink-0"><Coins size={16}/></div>
+                          <p className="text-xs text-gray-500">Redeem <span className="text-brand-black font-bold">2 Points</span> for every ₹1 value in your menu orders.</p>
+                       </div>
+                    </div>
 
-                      <button 
-                        onClick={handleShare}
-                        className="mt-8 flex items-center gap-3 px-10 py-4 bg-brand-gold text-brand-black font-bold uppercase tracking-widest text-xs rounded-xl shadow-xl hover:bg-brand-black hover:text-white transition-all transform hover:-translate-y-1"
-                      >
-                         <Share2 size={16} /> Share My Link
-                      </button>
-                   </div>
-                </div>
+                    <div className="bg-brand-cream/50 p-6 rounded-2xl border border-brand-gold/10 text-center mt-8">
+                      <p className="text-[10px] font-bold uppercase text-gray-500 mb-4 tracking-widest">Share & Earn Bonus</p>
+                      <div className="bg-white border-2 border-dashed border-brand-gold/30 p-3 rounded-xl font-display font-bold text-xl tracking-widest text-brand-black mb-4">
+                        {profile?.referralCode || '----'}
+                      </div>
+                      <div className="flex gap-2">
+                        <button onClick={copyReferral} className="flex-1 py-3 bg-brand-dark text-white rounded-lg text-[10px] font-bold uppercase flex items-center justify-center gap-2">
+                          {copySuccess ? <CheckCircle2 size={14}/> : <Copy size={14}/>} {copySuccess ? 'Copied' : 'Copy'}
+                        </button>
+                        <button onClick={handleShare} className="flex-1 py-3 bg-brand-gold text-brand-black rounded-lg text-[10px] font-bold uppercase flex items-center justify-center gap-2">
+                          <Share2 size={14}/> Share
+                        </button>
+                      </div>
+                    </div>
+                  </div>
 
-                <div className="mt-12 grid grid-cols-1 sm:grid-cols-2 gap-6">
-                   <div className="p-6 bg-white border border-gray-100 rounded-2xl flex items-start gap-4 shadow-sm">
-                      <div className="w-10 h-10 bg-emerald-500/10 text-emerald-500 rounded-xl flex items-center justify-center shrink-0 font-bold">50</div>
-                      <p className="text-xs text-gray-600 leading-relaxed"><span className="font-bold text-brand-black block uppercase tracking-tighter">Signup Bonus</span> Inviter gets 50 points when a friend joins using their code.</p>
-                   </div>
-                   <div className="p-6 bg-white border border-gray-100 rounded-2xl flex items-start gap-4 shadow-sm">
-                      <div className="w-10 h-10 bg-blue-500/10 text-blue-500 rounded-xl flex items-center justify-center shrink-0 font-bold">30</div>
-                      <p className="text-xs text-gray-600 leading-relaxed"><span className="font-bold text-brand-black block uppercase tracking-tighter">Loyalty Reward</span> Both get 30 points when the referred friend completes their 1st order.</p>
-                   </div>
+                  <div className="space-y-6">
+                    <h4 className="text-brand-black font-bold uppercase tracking-widest text-xs border-b border-gray-100 pb-2">Recent Transactions</h4>
+                    <div className="space-y-4 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
+                       {profile?.pointsHistory && profile.pointsHistory.length > 0 ? (
+                         profile.pointsHistory.map((tx, i) => (
+                           <div key={i} className="flex items-center justify-between p-4 bg-gray-50 rounded-xl border border-gray-100 hover:border-brand-gold/20 transition-all">
+                             <div className="flex items-center gap-4">
+                                <div className={`w-10 h-10 rounded-full flex items-center justify-center ${tx.type === 'earned' ? 'bg-emerald-500/10 text-emerald-500' : 'bg-rose-500/10 text-rose-500'}`}>
+                                  {tx.type === 'earned' ? <ArrowUpRight size={18}/> : <ArrowDownLeft size={18}/>}
+                                </div>
+                                <div>
+                                  <p className="text-[10px] font-bold uppercase text-brand-black tracking-tighter capitalize">{tx.via} {tx.type}</p>
+                                  <p className="text-[8px] text-gray-400 uppercase font-medium">{new Date(tx.date).toLocaleDateString()}</p>
+                                </div>
+                             </div>
+                             <span className={`text-sm font-bold ${tx.type === 'earned' ? 'text-emerald-500' : 'text-rose-500'}`}>
+                                {tx.type === 'earned' ? '+' : '-'}{tx.amount}
+                             </span>
+                           </div>
+                         ))
+                       ) : (
+                         <div className="text-center py-12 text-gray-400 italic text-xs">No transactions recorded yet. Start ordering to earn points!</div>
+                       )}
+                    </div>
+                  </div>
                 </div>
              </div>
           </div>

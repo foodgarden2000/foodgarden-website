@@ -67,6 +67,14 @@ export interface Order {
   cancelledBy?: 'user' | 'admin';
 }
 
+export interface PointTransaction {
+  type: 'earned' | 'spent';
+  amount: number;
+  via: 'order' | 'referral' | 'signup' | 'bonus';
+  date: string;
+  orderId?: string;
+}
+
 export interface UserProfile {
   uid: string;
   name: string;
@@ -74,6 +82,7 @@ export interface UserProfile {
   email: string;
   role: 'registered' | 'subscriber' | 'admin';
   points: number;
+  pointsHistory?: PointTransaction[];
   referralCode: string;
   referredBy: string | null; // Stores referralCode of inviter
   totalReferrals: number;
