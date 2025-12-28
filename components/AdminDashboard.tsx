@@ -353,153 +353,155 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
 
   return (
     <div className="fixed inset-0 z-[100] bg-brand-black/95 backdrop-blur-xl flex flex-col overflow-hidden font-sans text-white">
-      <div className="p-6 border-b border-brand-gold/20 flex flex-col md:flex-row items-center justify-between gap-4 shrink-0 bg-brand-black">
-        <div className="flex items-center gap-4">
-          <div className="w-12 h-12 bg-brand-gold/10 rounded-xl flex items-center justify-center text-brand-gold border border-brand-gold/20 shadow-lg"><ShoppingBag size={24} /></div>
+      <div className="p-4 md:p-6 border-b border-brand-gold/20 flex flex-col md:flex-row items-center justify-between gap-4 shrink-0 bg-brand-black">
+        <div className="flex items-center gap-3 md:gap-4 w-full md:w-auto">
+          <div className="w-10 h-10 md:w-12 md:h-12 bg-brand-gold/10 rounded-xl flex items-center justify-center text-brand-gold border border-brand-gold/20 shadow-lg"><ShoppingBag size={20} className="md:w-[24px] md:h-[24px]" /></div>
           <div>
-            <h2 className="text-2xl font-display font-bold text-brand-gold tracking-widest uppercase">Admin Hub</h2>
-            <p className="text-[8px] text-gray-500 uppercase tracking-widest font-bold">Food Garden Control Panel</p>
+            <h2 className="text-lg md:text-2xl font-display font-bold text-brand-gold tracking-widest uppercase">Admin Hub</h2>
+            <p className="text-[7px] md:text-[8px] text-gray-500 uppercase tracking-widest font-bold">Food Garden Control Panel</p>
           </div>
+          <button onClick={onClose} className="md:hidden ml-auto text-brand-red"><LogOut size={20} /></button>
         </div>
-        <div className="flex flex-wrap items-center justify-center bg-brand-dark p-1 rounded-lg border border-brand-gold/10">
+        <div className="flex flex-wrap items-center justify-center bg-brand-dark p-1 rounded-lg border border-brand-gold/10 w-full md:w-auto overflow-x-auto no-scrollbar">
           {['orders', 'menu', 'festivals', 'referrals', 'contact'].map(tab => (
-            <button key={tab} onClick={() => setActiveTab(tab as any)} className={`flex items-center gap-2 px-6 py-2 rounded-md font-bold text-[10px] uppercase tracking-widest transition-all ${activeTab === tab ? 'bg-brand-gold text-brand-black shadow-lg' : 'text-gray-400'}`}>
-              {tab === 'orders' ? <ShoppingBag size={12} /> : 
-               tab === 'menu' ? <Utensils size={12} /> : 
-               tab === 'festivals' ? <PartyPopper size={12} /> : 
-               tab === 'referrals' ? <Gift size={12} /> : <MapPin size={12} />} {tab}
+            <button key={tab} onClick={() => setActiveTab(tab as any)} className={`flex items-center gap-1.5 px-3 md:px-6 py-2 rounded-md font-bold text-[9px] md:text-[10px] uppercase tracking-widest transition-all shrink-0 ${activeTab === tab ? 'bg-brand-gold text-brand-black shadow-lg' : 'text-gray-400'}`}>
+              {tab === 'orders' ? <ShoppingBag size={10} /> : 
+               tab === 'menu' ? <Utensils size={10} /> : 
+               tab === 'festivals' ? <PartyPopper size={10} /> : 
+               tab === 'referrals' ? <Gift size={10} /> : <MapPin size={10} />} {tab}
             </button>
           ))}
-          <button onClick={() => setIsSoundEnabled(!isSoundEnabled)} className={`flex items-center gap-2 px-6 py-2 rounded-md font-bold text-[10px] uppercase ml-2 border ${isSoundEnabled ? 'border-brand-gold text-brand-gold' : 'border-gray-800 text-gray-500'}`}>
-            {isSoundEnabled ? <Volume2 size={12} /> : <VolumeX size={12} />} {isSoundEnabled ? 'SOUND ON' : 'SOUND OFF'}
+          <button onClick={() => setIsSoundEnabled(!isSoundEnabled)} className={`hidden md:flex items-center gap-2 px-6 py-2 rounded-md font-bold text-[10px] uppercase ml-2 border ${isSoundEnabled ? 'border-brand-gold text-brand-gold' : 'border-gray-800 text-gray-500'}`}>
+            {isSoundEnabled ? <Volume2 size={12} /> : <VolumeX size={12} />} {isSoundEnabled ? 'SOUND' : 'MUTE'}
           </button>
-          <button onClick={onClose} className="flex items-center gap-2 px-6 py-2 rounded-md font-bold text-[10px] uppercase text-brand-red ml-2 border-l border-brand-gold/10"><LogOut size={12} /> Exit</button>
+          <button onClick={onClose} className="hidden md:flex items-center gap-2 px-6 py-2 rounded-md font-bold text-[10px] uppercase text-brand-red ml-2 border-l border-brand-gold/10"><LogOut size={12} /> Exit</button>
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-4 md:p-8">
+      <div className="flex-1 overflow-y-auto p-3 md:p-8">
         <div className="max-w-7xl mx-auto">
           {activeTab === 'orders' && (
-            <div className="animate-fade-in space-y-8">
-              <div className="bg-brand-dark/40 border border-brand-gold/10 p-6 rounded-3xl shadow-2xl space-y-6">
+            <div className="animate-fade-in space-y-6 md:space-y-8">
+              <div className="bg-brand-dark/40 border border-brand-gold/10 p-4 md:p-6 rounded-2xl md:rounded-3xl shadow-2xl space-y-6">
                 <div className="flex flex-col lg:flex-row justify-between lg:items-center gap-6">
                   <div>
-                    <h3 className="text-xl font-display text-white uppercase tracking-widest">Order Management</h3>
-                    <p className="text-[10px] text-gray-500 uppercase tracking-widest mt-1">Real-time control over all operations</p>
+                    <h3 className="text-lg md:text-xl font-display text-white uppercase tracking-widest">Order Management</h3>
+                    <p className="text-[9px] md:text-[10px] text-gray-500 uppercase tracking-widest mt-1">Real-time control</p>
                   </div>
-                  <div className="flex bg-black/40 p-1 rounded-xl border border-white/5 overflow-x-auto max-w-full">
+                  <div className="flex bg-black/40 p-1 rounded-xl border border-white/5 overflow-x-auto no-scrollbar max-w-full">
                     {[
-                      {id:'new', l:'New Orders', i:Zap},
+                      {id:'new', l:'New', i:Zap},
                       {id:'active', l:'Active', i:Clock},
-                      {id:'completed', l:'Completed', i:CheckCircle2},
-                      {id:'cancelled', l:'Cancelled', i:XCircle}
+                      {id:'completed', l:'Done', i:CheckCircle2},
+                      {id:'cancelled', l:'Cancel', i:XCircle}
                     ].map(t => (
-                      <button key={t.id} onClick={() => setOrderTab(t.id as OrderTab)} className={`px-5 py-2.5 rounded-lg text-[10px] font-bold uppercase tracking-widest transition-all flex items-center gap-2 shrink-0 ${orderTab === t.id ? 'bg-brand-gold text-brand-black' : 'text-gray-500 hover:text-white'}`}>
-                        <t.i size={12} /> {t.l}
+                      <button key={t.id} onClick={() => setOrderTab(t.id as OrderTab)} className={`px-4 md:px-5 py-2 md:py-2.5 rounded-lg text-[9px] md:text-[10px] font-bold uppercase tracking-widest transition-all flex items-center gap-2 shrink-0 ${orderTab === t.id ? 'bg-brand-gold text-brand-black' : 'text-gray-500 hover:text-white'}`}>
+                        <t.i size={10} className="md:w-[12px] md:h-[12px]" /> {t.l}
                       </button>
                     ))}
                   </div>
                 </div>
-                <div className="flex flex-wrap gap-4 items-center border-t border-white/5 pt-6">
-                  <div className="relative flex-1 min-w-[200px]">
-                    <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" size={16} />
-                    <input type="text" placeholder="Search ID, Name or Phone..." value={orderSearch} onChange={(e) => setOrderSearch(e.target.value)} className="w-full bg-black/30 border border-white/10 rounded-xl py-2.5 pl-10 pr-4 text-xs focus:border-brand-gold outline-none" />
+                <div className="flex flex-col md:flex-row gap-4 items-center border-t border-white/5 pt-6">
+                  <div className="relative w-full flex-1">
+                    <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" size={14} />
+                    <input type="text" placeholder="Search..." value={orderSearch} onChange={(e) => setOrderSearch(e.target.value)} className="w-full bg-black/30 border border-white/10 rounded-xl py-2 md:py-2.5 pl-10 pr-4 text-xs focus:border-brand-gold outline-none" />
                   </div>
-                  <div className="flex gap-2">
-                    <select value={typeFilter} onChange={e => setTypeFilter(e.target.value as any)} className="bg-black/30 border border-white/10 rounded-xl px-4 py-2 text-[10px] font-bold uppercase outline-none focus:border-brand-gold">
+                  <div className="flex gap-2 w-full md:w-auto">
+                    <select value={typeFilter} onChange={e => setTypeFilter(e.target.value as any)} className="flex-1 md:flex-none bg-black/30 border border-white/10 rounded-xl px-3 py-2 text-[9px] md:text-[10px] font-bold uppercase outline-none focus:border-brand-gold">
                       <option value="all">ALL TYPES</option>
-                      <option value="food">FOOD ONLY</option>
+                      <option value="food">FOOD</option>
                       <option value="table">TABLES</option>
                       <option value="cabin">CABINS</option>
                       <option value="event">EVENTS</option>
                     </select>
-                    <select value={userFilter} onChange={e => setUserFilter(e.target.value as any)} className="bg-black/30 border border-white/10 rounded-xl px-4 py-2 text-[10px] font-bold uppercase outline-none focus:border-brand-gold">
+                    <select value={userFilter} onChange={e => setUserFilter(e.target.value as any)} className="flex-1 md:flex-none bg-black/30 border border-white/10 rounded-xl px-3 py-2 text-[9px] md:text-[10px] font-bold uppercase outline-none focus:border-brand-gold">
                       <option value="all">ALL USERS</option>
                       <option value="guest">GUESTS</option>
-                      <option value="registered">REGISTERED</option>
+                      <option value="registered">REG.</option>
                     </select>
                   </div>
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 gap-6">
+              <div className="grid grid-cols-1 gap-4 md:gap-6">
                 {filteredOrders.length > 0 ? filteredOrders.map((order) => {
                   const typeBadge = getOrderTypeBadge(order.orderType || '');
                   const isFood = (order.orderType || '').toLowerCase().includes('delivery') || (order.orderType || '').toLowerCase().includes('order');
                   return (
-                    <div key={order.id} className="bg-brand-dark/50 border border-gray-800 rounded-3xl p-6 md:p-8 flex flex-col lg:flex-row justify-between lg:items-center gap-8 group hover:border-brand-gold/30 transition-all shadow-xl">
+                    <div key={order.id} className="bg-brand-dark/50 border border-gray-800 rounded-2xl md:rounded-3xl p-4 md:p-8 flex flex-col lg:flex-row justify-between lg:items-center gap-6 md:gap-8 group hover:border-brand-gold/30 transition-all shadow-xl">
                       <div className="flex-1">
-                        <div className="flex flex-wrap items-center gap-3 mb-4">
-                          <span className={`px-3 py-1 rounded text-[9px] font-bold uppercase tracking-widest bg-brand-gold text-brand-black`}>
+                        <div className="flex flex-wrap items-center gap-2 md:gap-3 mb-4">
+                          <span className={`px-2 md:px-3 py-1 rounded text-[8px] md:text-[9px] font-bold uppercase tracking-widest bg-brand-gold text-brand-black`}>
                             {order.userType || 'GUEST'}
                           </span>
-                          <span className={`px-3 py-1 rounded border flex items-center gap-1.5 text-[9px] font-bold uppercase tracking-widest ${typeBadge.color}`}>
-                            <typeBadge.icon size={12} /> {typeBadge.label}
+                          <span className={`px-2 md:px-3 py-1 rounded border flex items-center gap-1.5 text-[8px] md:text-[9px] font-bold uppercase tracking-widest ${typeBadge.color}`}>
+                            <typeBadge.icon size={10} className="md:w-[12px] md:h-[12px]" /> {typeBadge.label}
                           </span>
                           {order.paymentMode === 'points' && (
-                            <span className="px-3 py-1 rounded border border-brand-red/30 bg-brand-red/10 text-brand-red text-[9px] font-bold uppercase tracking-widest flex items-center gap-1">
-                              <Coins size={10} /> POINT ORDER
+                            <span className="px-2 md:px-3 py-1 rounded border border-brand-red/30 bg-brand-red/10 text-brand-red text-[8px] md:text-[9px] font-bold uppercase tracking-widest flex items-center gap-1">
+                              <Coins size={8} /> POINT ORDER
                             </span>
                           )}
-                          <span className="text-[10px] text-gray-500 font-medium">#{order.id.slice(-6).toUpperCase()}</span>
-                          <span className="ml-auto lg:ml-0 text-[10px] text-brand-gold/60 font-bold bg-brand-gold/5 px-2 py-0.5 rounded border border-brand-gold/10">
+                          <span className="text-[9px] md:text-[10px] text-gray-500 font-medium">#{order.id.slice(-6).toUpperCase()}</span>
+                          <span className="ml-auto lg:ml-0 text-[9px] md:text-[10px] text-brand-gold/60 font-bold bg-brand-gold/5 px-2 py-0.5 rounded border border-brand-gold/10">
                             {getTimeElapsed(order.createdAt)}
                           </span>
                         </div>
-                        <div className="flex gap-6 items-start">
-                          <div className="w-14 h-14 bg-black/40 rounded-2xl flex items-center justify-center border border-white/5 shrink-0">
-                            {isFood ? <Package className="text-brand-gold" size={24} /> : <Calendar className="text-brand-gold" size={24} />}
+                        <div className="flex gap-4 md:gap-6 items-start">
+                          <div className="w-10 h-10 md:w-14 md:h-14 bg-black/40 rounded-xl md:rounded-2xl flex items-center justify-center border border-white/5 shrink-0">
+                            {/* Fixed: merged duplicate className attributes */}
+                            {isFood ? <Package className="text-brand-gold md:w-[24px] md:h-[24px]" size={20} /> : <Calendar className="text-brand-gold md:w-[24px] md:h-[24px]" size={20} />}
                           </div>
                           <div className="flex-1">
-                            <h4 className="text-white font-bold text-xl mb-1">{order.itemName || 'Untitled Item'}</h4>
-                            <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm text-gray-400">
-                              <span className="flex items-center gap-1.5 font-medium"><User size={14} className="text-brand-gold" /> {order.userName || 'Guest'}</span>
-                              <span className="flex items-center gap-1.5 font-medium"><Smartphone size={14} className="text-brand-gold" /> {order.userPhone || 'N/A'}</span>
+                            <h4 className="text-white font-bold text-lg md:text-xl mb-1 leading-tight">{order.itemName || 'Untitled Item'}</h4>
+                            <div className="flex flex-wrap items-center gap-x-4 md:gap-x-6 gap-y-1 text-xs text-gray-400">
+                              <span className="flex items-center gap-1.5 font-medium"><User size={12} className="text-brand-gold" /> {order.userName || 'Guest'}</span>
+                              <span className="flex items-center gap-1.5 font-medium"><Smartphone size={12} className="text-brand-gold" /> {order.userPhone || 'N/A'}</span>
                             </div>
-                            <div className="mt-4 p-4 bg-black/20 rounded-2xl border border-white/5">
-                              <p className="text-[10px] text-gray-500 uppercase font-bold tracking-widest">Customer Details</p>
-                              <p className="text-xs text-gray-300 italic">{order.address || 'No details provided'}</p>
+                            <div className="mt-4 p-3 md:p-4 bg-black/20 rounded-xl md:rounded-2xl border border-white/5">
+                              <p className="text-[8px] md:text-[10px] text-gray-500 uppercase font-bold tracking-widest">Details</p>
+                              <p className="text-[10px] md:text-xs text-gray-300 italic">{order.address || 'No details provided'}</p>
                             </div>
                           </div>
                         </div>
                       </div>
-                      <div className="flex flex-col md:flex-row lg:flex-col items-center lg:items-end gap-6 pt-6 lg:pt-0 border-t lg:border-t-0 border-white/5">
-                        <div className="text-center lg:text-right">
-                          <p className="text-[10px] text-gray-600 font-bold uppercase tracking-widest mb-1">
+                      <div className="flex flex-col md:flex-row lg:flex-col items-center lg:items-end gap-4 md:gap-6 pt-4 lg:pt-0 border-t lg:border-t-0 border-white/5">
+                        <div className="text-center lg:text-right w-full md:w-auto">
+                          <p className="text-[9px] text-gray-600 font-bold uppercase tracking-widest mb-1">
                             {order.paymentMode === 'points' ? 'POINTS SPENT' : 'ORDER VALUE'}
                           </p>
-                          <p className="text-3xl font-display font-bold text-brand-gold">
+                          <p className="text-2xl md:text-3xl font-display font-bold text-brand-gold">
                             {order.paymentMode === 'points' ? `${Math.floor(order.pointsUsed || 0)} Pts` : `₹${order.orderAmount || 0}`}
                           </p>
                         </div>
-                        <div className="flex flex-wrap justify-center lg:justify-end gap-2">
+                        <div className="flex flex-wrap justify-center lg:justify-end gap-2 w-full md:w-auto">
                           {order.status === 'pending' && (
                             <>
-                              <button onClick={() => handleUpdateOrderStatus(order, 'accepted')} className="px-6 py-3 bg-emerald-500 text-white rounded-xl text-[10px] font-bold uppercase tracking-widest hover:bg-emerald-600 shadow-lg">Accept</button>
-                              <button onClick={() => handleUpdateOrderStatus(order, 'rejected')} className="px-6 py-3 border border-rose-500 text-rose-500 rounded-xl text-[10px] font-bold uppercase tracking-widest hover:bg-rose-500 hover:text-white">Reject</button>
+                              <button onClick={() => handleUpdateOrderStatus(order, 'accepted')} className="flex-1 md:flex-none px-4 md:px-6 py-3 bg-emerald-500 text-white rounded-xl text-[9px] md:text-[10px] font-bold uppercase tracking-widest hover:bg-emerald-600 shadow-lg">Accept</button>
+                              <button onClick={() => handleUpdateOrderStatus(order, 'rejected')} className="flex-1 md:flex-none px-4 md:px-6 py-3 border border-rose-500 text-rose-500 rounded-xl text-[9px] md:text-[10px] font-bold uppercase tracking-widest hover:bg-rose-500 hover:text-white">Reject</button>
                             </>
                           )}
                           {['accepted', 'preparing', 'ready'].includes(order.status) && (
-                            <div className="flex gap-2">
+                            <div className="flex gap-2 w-full md:w-auto">
                               {isFood ? (
                                 <>
-                                  {order.status === 'accepted' && <button onClick={() => handleUpdateOrderStatus(order, 'preparing')} className="px-5 py-3 bg-purple-500 text-white rounded-xl text-[10px] font-bold uppercase tracking-widest">Prepare</button>}
-                                  {order.status === 'preparing' && <button onClick={() => handleUpdateOrderStatus(order, 'ready')} className="px-5 py-3 bg-indigo-500 text-white rounded-xl text-[10px] font-bold uppercase tracking-widest">Ready</button>}
-                                  {order.status === 'ready' && <button onClick={() => handleUpdateOrderStatus(order, 'out_for_delivery')} className="px-5 py-3 bg-orange-500 text-white rounded-xl text-[10px] font-bold uppercase tracking-widest">On-Way</button>}
+                                  {order.status === 'accepted' && <button onClick={() => handleUpdateOrderStatus(order, 'preparing')} className="flex-1 md:flex-none px-4 py-3 bg-purple-500 text-white rounded-xl text-[9px] md:text-[10px] font-bold uppercase tracking-widest">Prepare</button>}
+                                  {order.status === 'preparing' && <button onClick={() => handleUpdateOrderStatus(order, 'ready')} className="flex-1 md:flex-none px-4 py-3 bg-indigo-500 text-white rounded-xl text-[9px] md:text-[10px] font-bold uppercase tracking-widest">Ready</button>}
+                                  {order.status === 'ready' && <button onClick={() => handleUpdateOrderStatus(order, 'out_for_delivery')} className="flex-1 md:flex-none px-4 py-3 bg-orange-500 text-white rounded-xl text-[9px] md:text-[10px] font-bold uppercase tracking-widest">On-Way</button>}
                                 </>
                               ) : (
-                                <button onClick={() => handleUpdateOrderStatus(order, 'delivered')} className="px-5 py-3 bg-brand-gold text-brand-black rounded-xl text-[10px] font-bold uppercase tracking-widest">Complete</button>
+                                <button onClick={() => handleUpdateOrderStatus(order, 'delivered')} className="flex-1 md:flex-none px-4 py-3 bg-brand-gold text-brand-black rounded-xl text-[9px] md:text-[10px] font-bold uppercase tracking-widest">Done</button>
                               )}
-                              <button onClick={() => handleUpdateOrderStatus(order, 'cancelled_by_admin')} className="px-5 py-3 border border-rose-500 text-rose-500 rounded-xl text-[10px] font-bold uppercase tracking-widest">Cancel</button>
+                              <button onClick={() => handleUpdateOrderStatus(order, 'cancelled_by_admin')} className="px-4 py-3 border border-rose-500 text-rose-500 rounded-xl text-[9px] md:text-[10px] font-bold uppercase tracking-widest shrink-0"><X size={14}/></button>
                             </div>
                           )}
                           {order.status === 'out_for_delivery' && (
-                            <button onClick={() => handleUpdateOrderStatus(order, 'delivered')} className="px-6 py-3 bg-brand-gold text-brand-black rounded-xl text-[10px] font-bold uppercase tracking-widest hover:bg-white shadow-xl">Mark Delivered</button>
+                            <button onClick={() => handleUpdateOrderStatus(order, 'delivered')} className="w-full md:w-auto px-6 py-3 bg-brand-gold text-brand-black rounded-xl text-[9px] md:text-[10px] font-bold uppercase tracking-widest hover:bg-white shadow-xl">Complete Order</button>
                           )}
                           {['delivered', 'cancelled_by_admin', 'cancelled_by_user', 'rejected'].includes(order.status) && (
-                            <div className="flex items-center gap-4">
-                              <span className="text-[10px] text-gray-500 uppercase font-bold tracking-widest">{getStatusLabel(order.status)}</span>
-                              <button onClick={() => deleteItem('orders', order.id)} className="p-3 text-gray-700 hover:text-rose-500 bg-black/20 rounded-xl transition-all"><Trash2 size={20}/></button>
+                            <div className="flex items-center gap-4 w-full md:w-auto justify-end">
+                              <span className="text-[9px] md:text-[10px] text-gray-500 uppercase font-bold tracking-widest">{getStatusLabel(order.status)}</span>
+                              <button onClick={() => deleteItem('orders', order.id)} className="p-2 md:p-3 text-gray-700 hover:text-rose-500 bg-black/20 rounded-xl transition-all"><Trash2 size={16} className="md:w-[20px] md:h-[20px]" /></button>
                             </div>
                           )}
                         </div>
@@ -518,116 +520,116 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
           {activeTab === 'menu' && <div className="animate-fade-in"><AdminMenu /></div>}
           {activeTab === 'festivals' && <div className="animate-fade-in"><AdminFestivals /></div>}
           {activeTab === 'referrals' && (
-            <div className="animate-fade-in space-y-8">
+            <div className="animate-fade-in space-y-6 md:space-y-8">
               <div className="bg-brand-dark/40 border border-brand-gold/10 p-6 rounded-3xl shadow-xl">
                  <h3 className="text-xl font-display font-bold text-white uppercase tracking-widest">Referral Ecosystem</h3>
               </div>
-              <div className="overflow-x-auto bg-brand-dark/40 border border-white/5 rounded-3xl">
-                <table className="w-full text-left text-xs">
-                  <thead className="bg-black/40 text-gray-500 uppercase tracking-widest font-bold">
-                    <tr><th className="px-6 py-4">User</th><th className="px-6 py-4">Code</th><th className="px-6 py-4">Invited By</th><th className="px-6 py-4">Referrals</th><th className="px-6 py-4">Points</th><th className="px-6 py-4">Actions</th></tr>
-                  </thead>
-                  <tbody className="divide-y divide-white/5">
-                    {allUsers.filter(u => u.role !== 'admin').map(user => (
-                      <tr key={user.uid} className="hover:bg-white/5 transition-colors">
-                        <td className="px-6 py-4"><div className="flex flex-col"><span className="text-white font-bold">{user.name}</span><span className="text-[10px] text-gray-500">{user.phone}</span></div></td>
-                        <td className="px-6 py-4 text-brand-gold font-bold">{user.referralCode}</td>
-                        <td className="px-6 py-4">{user.referredBy ? <span className="px-2 py-0.5 bg-brand-gold/10 text-brand-gold border border-brand-gold/20 rounded text-[10px] font-bold">{user.referredBy}</span> : <span className="text-gray-600">—</span>}</td>
-                        <td className="px-6 py-4"><span className="flex items-center gap-1.5 text-white font-medium"><Users size={12} className="text-brand-gold" /> {user.totalReferrals || 0}</span></td>
-                        <td className="px-6 py-4 font-bold text-emerald-500">{Math.floor(user.points || 0)} Pts</td>
-                        <td className="px-6 py-4"><button onClick={() => openReferralHistory(user)} className="px-4 py-1.5 bg-brand-gold/10 text-brand-gold border border-brand-gold/20 rounded text-[10px] font-bold uppercase tracking-widest">View History</button></td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+              <div className="bg-brand-dark/40 border border-white/5 rounded-2xl md:rounded-3xl overflow-hidden">
+                <div className="overflow-x-auto no-scrollbar">
+                  <table className="w-full text-left text-[10px] md:text-xs min-w-[600px]">
+                    <thead className="bg-black/40 text-gray-500 uppercase tracking-widest font-bold">
+                      <tr><th className="px-6 py-4">User</th><th className="px-6 py-4">Code</th><th className="px-6 py-4">Invited By</th><th className="px-6 py-4">Referrals</th><th className="px-6 py-4">Points</th><th className="px-6 py-4">Actions</th></tr>
+                    </thead>
+                    <tbody className="divide-y divide-white/5">
+                      {allUsers.filter(u => u.role !== 'admin').map(user => (
+                        <tr key={user.uid} className="hover:bg-white/5 transition-colors">
+                          <td className="px-6 py-4"><div className="flex flex-col"><span className="text-white font-bold">{user.name}</span><span className="text-[9px] md:text-[10px] text-gray-500">{user.phone}</span></div></td>
+                          <td className="px-6 py-4 text-brand-gold font-bold">{user.referralCode}</td>
+                          <td className="px-6 py-4">{user.referredBy ? <span className="px-2 py-0.5 bg-brand-gold/10 text-brand-gold border border-brand-gold/20 rounded text-[9px] md:text-[10px] font-bold">{user.referredBy}</span> : <span className="text-gray-600">—</span>}</td>
+                          <td className="px-6 py-4"><span className="flex items-center gap-1.5 text-white font-medium"><Users size={12} className="text-brand-gold" /> {user.totalReferrals || 0}</span></td>
+                          <td className="px-6 py-4 font-bold text-emerald-500">{Math.floor(user.points || 0)} Pts</td>
+                          <td className="px-6 py-4"><button onClick={() => openReferralHistory(user)} className="px-4 py-1.5 bg-brand-gold/10 text-brand-gold border border-brand-gold/20 rounded text-[9px] md:text-[10px] font-bold uppercase tracking-widest">History</button></td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               </div>
             </div>
           )}
           {activeTab === 'contact' && (
-            <div className="animate-fade-in space-y-8 max-w-4xl mx-auto">
-              <div className="bg-brand-dark/40 border border-brand-gold/10 p-6 rounded-3xl shadow-xl">
-                 <h3 className="text-xl font-display font-bold text-white uppercase tracking-widest">Restaurant Identity & Contact</h3>
-                 <p className="text-[10px] text-gray-500 uppercase tracking-widest mt-1">Control how customers reach and find you</p>
+            <div className="animate-fade-in space-y-6 md:space-y-8 max-w-4xl mx-auto px-1 md:px-0">
+              <div className="bg-brand-dark/40 border border-brand-gold/10 p-4 md:p-6 rounded-2xl md:rounded-3xl shadow-xl">
+                 <h3 className="text-lg md:text-xl font-display font-bold text-white uppercase tracking-widest">Identity & Contact</h3>
+                 <p className="text-[9px] md:text-[10px] text-gray-500 uppercase tracking-widest mt-1">Global settings</p>
               </div>
               
-              <form onSubmit={handleSaveContact} className="bg-brand-dark/50 border border-white/5 rounded-[2rem] p-8 md:p-12 space-y-10 shadow-2xl">
-                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+              <form onSubmit={handleSaveContact} className="bg-brand-dark/50 border border-white/5 rounded-2xl md:rounded-[2rem] p-6 md:p-12 space-y-8 md:space-y-10 shadow-2xl">
+                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-8">
                     <div className="space-y-3">
-                       <label className="flex items-center gap-2 text-[10px] text-gray-500 uppercase font-bold tracking-widest ml-1"><MapPin size={12} className="text-brand-gold" /> Restaurant Address</label>
+                       <label className="flex items-center gap-2 text-[9px] md:text-[10px] text-gray-500 uppercase font-bold tracking-widest ml-1"><MapPin size={12} className="text-brand-gold" /> Address</label>
                        <textarea 
                           required 
                           value={contactData.address} 
                           onChange={e => setContactData({...contactData, address: e.target.value})} 
-                          className="w-full bg-black/40 border border-gray-700 rounded-2xl p-4 text-white focus:border-brand-gold outline-none h-32 resize-none font-sans text-sm"
+                          className="w-full bg-black/40 border border-gray-700 rounded-xl p-4 text-white focus:border-brand-gold outline-none h-24 md:h-32 resize-none font-sans text-xs md:text-sm"
                           placeholder="Full Street Address"
                        />
                     </div>
-                    <div className="space-y-8">
+                    <div className="space-y-6 md:space-y-8">
                        <div className="space-y-3">
-                          <label className="flex items-center gap-2 text-[10px] text-gray-500 uppercase font-bold tracking-widest ml-1"><Clock size={12} className="text-brand-gold" /> Opening Hours</label>
+                          <label className="flex items-center gap-2 text-[9px] md:text-[10px] text-gray-500 uppercase font-bold tracking-widest ml-1"><Clock size={12} className="text-brand-gold" /> Hours</label>
                           <input 
                              required 
                              value={contactData.hours || ''} 
                              onChange={e => setContactData({...contactData, hours: e.target.value})} 
-                             className="w-full bg-black/40 border border-gray-700 rounded-xl p-4 text-white focus:border-brand-gold outline-none font-sans text-sm"
-                             placeholder="e.g. 11:00 AM – 10:00 PM"
+                             className="w-full bg-black/40 border border-gray-700 rounded-xl p-4 text-white focus:border-brand-gold outline-none font-sans text-xs md:text-sm"
+                             placeholder="e.g. 11 AM – 10 PM"
                           />
                        </div>
                        <div className="space-y-3">
-                          <label className="flex items-center gap-2 text-[10px] text-gray-500 uppercase font-bold tracking-widest ml-1"><Mail size={12} className="text-brand-gold" /> Business Email</label>
+                          <label className="flex items-center gap-2 text-[9px] md:text-[10px] text-gray-500 uppercase font-bold tracking-widest ml-1"><Mail size={12} className="text-brand-gold" /> Email</label>
                           <input 
                              type="email"
                              value={contactData.email || ''} 
                              onChange={e => setContactData({...contactData, email: e.target.value})} 
-                             className="w-full bg-black/40 border border-gray-700 rounded-xl p-4 text-white focus:border-brand-gold outline-none font-sans text-sm"
+                             className="w-full bg-black/40 border border-gray-700 rounded-xl p-4 text-white focus:border-brand-gold outline-none font-sans text-xs md:text-sm"
                              placeholder="contact@foodgarden.com"
                           />
                        </div>
                     </div>
                  </div>
 
-                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-8">
                     <div className="space-y-3">
-                       <label className="flex items-center gap-2 text-[10px] text-gray-500 uppercase font-bold tracking-widest ml-1"><Smartphone size={12} className="text-brand-gold" /> Contact Number (Calling)</label>
+                       <label className="flex items-center gap-2 text-[9px] md:text-[10px] text-gray-500 uppercase font-bold tracking-widest ml-1"><Smartphone size={12} className="text-brand-gold" /> Phone (Call)</label>
                        <input 
                           required 
                           value={contactData.phone} 
                           onChange={e => setContactData({...contactData, phone: e.target.value})} 
-                          className="w-full bg-black/40 border border-gray-700 rounded-xl p-4 text-white focus:border-brand-gold outline-none font-sans text-sm"
+                          className="w-full bg-black/40 border border-gray-700 rounded-xl p-4 text-white focus:border-brand-gold outline-none font-sans text-xs md:text-sm"
                           placeholder="+91 88094 77481"
                        />
                     </div>
                     <div className="space-y-3">
-                       <label className="flex items-center gap-2 text-[10px] text-gray-500 uppercase font-bold tracking-widest ml-1"><MessageCircle size={12} className="text-emerald-500" /> WhatsApp Business (Ordering)</label>
+                       <label className="flex items-center gap-2 text-[9px] md:text-[10px] text-gray-500 uppercase font-bold tracking-widest ml-1"><MessageCircle size={12} className="text-emerald-500" /> WhatsApp (Ordering)</label>
                        <input 
                           required 
                           value={contactData.whatsapp} 
                           onChange={e => setContactData({...contactData, whatsapp: e.target.value})} 
-                          className="w-full bg-black/40 border border-gray-700 rounded-xl p-4 text-white focus:border-brand-gold outline-none font-sans text-sm"
-                          placeholder="918809477481 (Include Country Code, no +)"
+                          className="w-full bg-black/40 border border-gray-700 rounded-xl p-4 text-white focus:border-brand-gold outline-none font-sans text-xs md:text-sm"
+                          placeholder="918809477481"
                        />
                     </div>
                  </div>
 
-                 <div className="pt-6 border-t border-white/5 space-y-8">
-                    <h4 className="text-[10px] text-gray-600 uppercase font-bold tracking-[0.3em]">Social Media Presence</h4>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                 <div className="pt-6 border-t border-white/5 space-y-6 md:space-y-8">
+                    <h4 className="text-[9px] md:text-[10px] text-gray-600 uppercase font-bold tracking-[0.3em]">Social Media Presence</h4>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-8">
                        <div className="space-y-3">
-                          <label className="flex items-center gap-2 text-[10px] text-gray-500 uppercase font-bold tracking-widest ml-1"><Facebook size={12} className="text-blue-500" /> Facebook Page Link</label>
+                          <label className="flex items-center gap-2 text-[9px] md:text-[10px] text-gray-500 uppercase font-bold tracking-widest ml-1"><Facebook size={12} className="text-blue-500" /> Facebook Link</label>
                           <input 
                              value={contactData.facebook || ''} 
                              onChange={e => setContactData({...contactData, facebook: e.target.value})} 
-                             className="w-full bg-black/40 border border-gray-700 rounded-xl p-4 text-white focus:border-brand-gold outline-none font-sans text-sm"
-                             placeholder="https://facebook.com/foodgarden"
+                             className="w-full bg-black/40 border border-gray-700 rounded-xl p-4 text-white focus:border-brand-gold outline-none font-sans text-xs md:text-sm"
                           />
                        </div>
                        <div className="space-y-3">
-                          <label className="flex items-center gap-2 text-[10px] text-gray-500 uppercase font-bold tracking-widest ml-1"><Instagram size={12} className="text-pink-500" /> Instagram Profile Link</label>
+                          <label className="flex items-center gap-2 text-[9px] md:text-[10px] text-gray-500 uppercase font-bold tracking-widest ml-1"><Instagram size={12} className="text-pink-500" /> Instagram Link</label>
                           <input 
                              value={contactData.instagram || ''} 
                              onChange={e => setContactData({...contactData, instagram: e.target.value})} 
-                             className="w-full bg-black/40 border border-gray-700 rounded-xl p-4 text-white focus:border-brand-gold outline-none font-sans text-sm"
-                             placeholder="https://instagram.com/foodgarden"
+                             className="w-full bg-black/40 border border-gray-700 rounded-xl p-4 text-white focus:border-brand-gold outline-none font-sans text-xs md:text-sm"
                           />
                        </div>
                     </div>
@@ -637,7 +639,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
                     <button 
                        type="submit" 
                        disabled={isSavingContact}
-                       className="px-12 py-5 bg-brand-gold text-brand-black rounded-2xl font-bold uppercase tracking-widest text-xs hover:bg-white transition-all shadow-xl flex items-center gap-3 disabled:opacity-50"
+                       className="w-full md:w-auto px-12 py-4 md:py-5 bg-brand-gold text-brand-black rounded-2xl font-bold uppercase tracking-widest text-[10px] md:text-xs hover:bg-white transition-all shadow-xl flex items-center justify-center gap-3 disabled:opacity-50"
                     >
                        {isSavingContact ? <Loader2 size={18} className="animate-spin" /> : <ShieldCheck size={18} />}
                        Publish Updates
@@ -651,45 +653,45 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
 
       {selectedReferralUser && (
         <div className="fixed inset-0 z-[150] bg-black/95 backdrop-blur-md flex items-center justify-center p-4">
-          <div className="bg-brand-dark border border-brand-gold/30 rounded-3xl p-8 w-full max-w-2xl shadow-2xl animate-fade-in-up flex flex-col max-h-[90vh]">
-            <div className="flex justify-between items-center mb-8 border-b border-white/5 pb-4">
-               <div><h3 className="text-2xl font-display font-bold text-white uppercase tracking-widest">User Details</h3><p className="text-[10px] text-gray-500 uppercase tracking-widest mt-1">{selectedReferralUser.name}</p></div>
+          <div className="bg-brand-dark border border-brand-gold/30 rounded-2xl md:rounded-3xl p-6 md:p-8 w-full max-w-2xl shadow-2xl animate-fade-in-up flex flex-col max-h-[90vh]">
+            <div className="flex justify-between items-center mb-6 md:mb-8 border-b border-white/5 pb-4">
+               <div><h3 className="text-xl md:text-2xl font-display font-bold text-white uppercase tracking-widest">User Ledger</h3><p className="text-[9px] md:text-[10px] text-gray-500 uppercase tracking-widest mt-1">{selectedReferralUser.name}</p></div>
                <button onClick={() => setSelectedReferralUser(null)} className="text-gray-500 hover:text-white transition-colors"><X size={24} /></button>
             </div>
-            <div className="flex-1 overflow-y-auto space-y-4 pr-2">
+            <div className="flex-1 overflow-y-auto space-y-4 pr-1 no-scrollbar">
               <div className="grid grid-cols-2 gap-4 mb-6">
                 <div className="bg-black/40 p-4 rounded-xl border border-white/5">
-                  <p className="text-[10px] text-gray-500 uppercase font-bold tracking-widest mb-1">Total Points</p>
-                  <p className="text-2xl font-bold text-brand-gold">{Math.floor(selectedReferralUser.points || 0)}</p>
+                  <p className="text-[8px] md:text-[10px] text-gray-500 uppercase font-bold tracking-widest mb-1">Points</p>
+                  <p className="text-xl md:text-2xl font-bold text-brand-gold">{Math.floor(selectedReferralUser.points || 0)}</p>
                 </div>
                 <div className="bg-black/40 p-4 rounded-xl border border-white/5">
-                  <p className="text-[10px] text-gray-500 uppercase font-bold tracking-widest mb-1">Referrals</p>
-                  <p className="text-2xl font-bold text-brand-gold">{selectedReferralUser.totalReferrals || 0}</p>
+                  <p className="text-[8px] md:text-[10px] text-gray-500 uppercase font-bold tracking-widest mb-1">Referrals</p>
+                  <p className="text-xl md:text-2xl font-bold text-brand-gold">{selectedReferralUser.totalReferrals || 0}</p>
                 </div>
               </div>
 
-              <h4 className="text-white font-bold uppercase text-[10px] tracking-widest mb-4">Transaction Ledger</h4>
+              <h4 className="text-white font-bold uppercase text-[9px] md:text-[10px] tracking-widest mb-4">Transactions</h4>
               {selectedReferralUser.pointsHistory && selectedReferralUser.pointsHistory.length > 0 ? (
                 selectedReferralUser.pointsHistory.map((reward, idx) => (
-                  <div key={idx} className="p-4 bg-black/40 border border-white/5 rounded-2xl flex items-center justify-between">
-                    <div className="flex items-center gap-4">
-                      <div className={`w-10 h-10 rounded-full flex items-center justify-center ${reward.type === 'earned' ? 'bg-emerald-500/10 text-emerald-500' : 'bg-rose-500/10 text-rose-500'}`}>
-                        {reward.type === 'earned' ? <ArrowRight size={18} /> : <Zap size={18} />}
+                  <div key={idx} className="p-3 md:p-4 bg-black/40 border border-white/5 rounded-xl md:rounded-2xl flex items-center justify-between">
+                    <div className="flex items-center gap-3 md:gap-4">
+                      <div className={`w-8 h-8 md:w-10 md:h-10 rounded-full flex items-center justify-center ${reward.type === 'earned' ? 'bg-emerald-500/10 text-emerald-500' : 'bg-rose-500/10 text-rose-500'}`}>
+                        {reward.type === 'earned' ? <ArrowRight size={14} className="md:w-[18px] md:h-[18px]" /> : <Zap size={14} className="md:w-[18px] md:h-[18px]" />}
                       </div>
                       <div>
-                        <p className="text-white font-bold capitalize">{reward.via} {reward.type}</p>
-                        <p className="text-[9px] text-gray-600 uppercase tracking-widest">{new Date(reward.date).toLocaleString()}</p>
+                        <p className="text-white font-bold text-xs capitalize">{reward.via} {reward.type}</p>
+                        <p className="text-[8px] md:text-[9px] text-gray-600 uppercase tracking-widest">{new Date(reward.date).toLocaleDateString()}</p>
                       </div>
                     </div>
                     <div className="text-right">
-                      <p className={`font-bold ${reward.type === 'earned' ? 'text-emerald-500' : 'text-rose-500'}`}>
+                      <p className={`font-bold text-sm md:text-base ${reward.type === 'earned' ? 'text-emerald-500' : 'text-rose-500'}`}>
                         {reward.type === 'earned' ? '+' : '-'}{Math.floor(reward.amount)} Pts
                       </p>
                     </div>
                   </div>
                 ))
               ) : (
-                <div className="py-12 text-center text-gray-600 italic">No transactions found.</div>
+                <div className="py-12 text-center text-gray-600 italic text-xs">No transactions found.</div>
               )}
             </div>
           </div>

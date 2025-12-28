@@ -139,37 +139,36 @@ const Dashboard: React.FC<DashboardProps> = ({ user, points, adminOnlyRequest, r
   }
 
   return (
-    <div className="pt-32 pb-24 min-h-screen bg-brand-cream relative overflow-hidden font-sans text-brand-black">
+    <div className="pt-24 md:pt-32 pb-24 min-h-screen bg-brand-cream relative overflow-hidden font-sans text-brand-black">
       <div className="container mx-auto px-4 md:px-8 relative z-10">
         
-        <div className="flex flex-col md:flex-row items-center justify-between mb-12 gap-6">
-          <div className="flex items-center gap-6">
-            <div className="w-16 h-16 bg-brand-dark rounded-full flex items-center justify-center text-brand-gold border-2 border-brand-gold shadow-xl">
+        <div className="flex flex-col md:flex-row items-center justify-between mb-8 md:mb-12 gap-6">
+          <div className="flex flex-col md:flex-row items-center gap-4 md:gap-6 w-full md:w-auto">
+            <div className="w-16 h-16 bg-brand-dark rounded-full flex items-center justify-center text-brand-gold border-2 border-brand-gold shadow-xl shrink-0">
               <User size={32} />
             </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h2 className="text-2xl font-display font-bold text-brand-black">{profile?.name || 'Member'}</h2>
-                {/* Removed Premium Subscriber badge */}
+            <div className="text-center md:text-left">
+              <div className="flex flex-col md:flex-row items-center gap-1 md:gap-2">
+                <h2 className="text-xl md:text-2xl font-display font-bold text-brand-black leading-tight">{profile?.name || 'Member'}</h2>
               </div>
-              <p className="text-gray-500 text-xs font-sans">{user.email}</p>
+              <p className="text-gray-500 text-[10px] md:text-xs font-sans truncate max-w-[250px]">{user.email}</p>
             </div>
           </div>
           
-          <div className="flex flex-wrap justify-center bg-white p-1 rounded-xl shadow-sm border border-gray-100">
-            <button onClick={() => setActiveTab('profile')} className={`px-6 py-2 rounded-lg text-xs font-bold uppercase tracking-widest ${activeTab === 'profile' ? 'bg-brand-dark text-white' : 'text-gray-400'}`}>Profile</button>
-            <button onClick={() => setActiveTab('wallet')} className={`px-6 py-2 rounded-lg text-xs font-bold uppercase tracking-widest ${activeTab === 'wallet' ? 'bg-brand-dark text-white' : 'text-gray-400'}`}>My Wallet</button>
-            <button onClick={() => setActiveTab('orders')} className={`px-6 py-2 rounded-lg text-xs font-bold uppercase tracking-widest ${activeTab === 'orders' ? 'bg-brand-dark text-white' : 'text-gray-400'}`}>My Orders</button>
-            <button onClick={() => signOut(auth)} className="px-6 py-2 rounded-lg text-xs font-bold uppercase tracking-widest text-brand-red">Logout</button>
+          <div className="flex flex-wrap justify-center bg-white p-1 rounded-xl shadow-sm border border-gray-100 w-full md:w-auto overflow-x-auto no-scrollbar">
+            <button onClick={() => setActiveTab('profile')} className={`flex-1 md:flex-none px-4 md:px-6 py-2 rounded-lg text-[10px] md:text-xs font-bold uppercase tracking-widest transition-all ${activeTab === 'profile' ? 'bg-brand-dark text-white' : 'text-gray-400'}`}>Profile</button>
+            <button onClick={() => setActiveTab('wallet')} className={`flex-1 md:flex-none px-4 md:px-6 py-2 rounded-lg text-[10px] md:text-xs font-bold uppercase tracking-widest transition-all ${activeTab === 'wallet' ? 'bg-brand-dark text-white' : 'text-gray-400'}`}>Wallet</button>
+            <button onClick={() => setActiveTab('orders')} className={`flex-1 md:flex-none px-4 md:px-6 py-2 rounded-lg text-[10px] md:text-xs font-bold uppercase tracking-widest transition-all ${activeTab === 'orders' ? 'bg-brand-dark text-white' : 'text-gray-400'}`}>Orders</button>
+            <button onClick={() => signOut(auth)} className="px-4 md:px-6 py-2 rounded-lg text-[10px] md:text-xs font-bold uppercase tracking-widest text-brand-red">Logout</button>
           </div>
         </div>
 
         {activeTab === 'orders' && (
-          <div className="space-y-6 animate-fade-in">
+          <div className="space-y-4 md:space-y-6 animate-fade-in">
             {myOrders.length === 0 ? (
-              <div className="text-center py-24 bg-white rounded-3xl shadow-sm border border-gray-100">
+              <div className="text-center py-20 md:py-24 bg-white rounded-2xl md:rounded-3xl shadow-sm border border-gray-100">
                 <ShoppingBag size={48} className="text-gray-100 mx-auto mb-4" />
-                <h3 className="text-xl font-serif text-gray-500 italic">No orders yet.</h3>
+                <h3 className="text-lg md:text-xl font-serif text-gray-500 italic">No orders yet.</h3>
               </div>
             ) : (
               myOrders.map(order => {
@@ -177,43 +176,43 @@ const Dashboard: React.FC<DashboardProps> = ({ user, points, adminOnlyRequest, r
                 const canCancel = ['pending', 'accepted'].includes(order.status);
 
                 return (
-                  <div key={order.id} className="bg-white rounded-3xl p-8 border border-gray-100 shadow-sm hover:shadow-md transition-all">
+                  <div key={order.id} className="bg-white rounded-2xl md:rounded-3xl p-5 md:p-8 border border-gray-100 shadow-sm hover:shadow-md transition-all">
                     <div className="flex flex-col md:flex-row justify-between gap-6">
-                      <div className="flex gap-6 items-start">
-                        <div className={`p-4 rounded-2xl border ${statusInfo.color}`}>
-                          <Package size={28} />
+                      <div className="flex gap-4 md:gap-6 items-start">
+                        <div className={`p-3 md:p-4 rounded-xl md:rounded-2xl border shrink-0 ${statusInfo.color}`}>
+                          <Package size={24} className="md:w-[28px] md:h-[28px]" />
                         </div>
-                        <div>
-                          <div className="flex flex-wrap items-center gap-3 mb-2">
-                            <h4 className="font-bold text-2xl text-brand-black">{order.itemName}</h4>
-                            <span className={`text-[10px] uppercase font-bold px-3 py-1 rounded-full border ${statusInfo.color}`}>
+                        <div className="flex-1">
+                          <div className="flex flex-wrap items-center gap-2 md:gap-3 mb-3">
+                            <h4 className="font-bold text-lg md:text-2xl text-brand-black leading-tight">{order.itemName}</h4>
+                            <span className={`text-[8px] md:text-[10px] uppercase font-bold px-2 md:px-3 py-1 rounded-full border shrink-0 ${statusInfo.color}`}>
                               {statusInfo.label}
                             </span>
                             {order.paymentMode === 'points' && (
-                              <span className="text-[10px] uppercase font-bold px-3 py-1 rounded-full bg-brand-red/10 text-brand-red border border-brand-red/20 flex items-center gap-1">
-                                <Coins size={10} /> POINT ORDER
+                              <span className="text-[8px] md:text-[10px] uppercase font-bold px-2 md:px-3 py-1 rounded-full bg-brand-red/10 text-brand-red border border-brand-red/20 flex items-center gap-1 shrink-0">
+                                <Coins size={8} className="md:w-[10px] md:h-[10px]" /> POINTS
                               </span>
                             )}
                           </div>
-                          <div className="flex flex-wrap items-center gap-4 text-xs text-gray-400">
-                             <span className="flex items-center gap-1.5 font-bold uppercase tracking-wider"><Clock size={14} className="text-brand-gold" /> {new Date(order.createdAt).toLocaleDateString()}</span>
-                             <span className="flex items-center gap-1.5 font-bold uppercase tracking-wider"><Tag size={14} className="text-brand-gold" /> {(order.orderType || '').replace(/_/g, ' ')}</span>
+                          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[10px] md:text-xs text-gray-400">
+                             <span className="flex items-center gap-1.5 font-bold uppercase tracking-wider"><Clock size={12} className="text-brand-gold" /> {new Date(order.createdAt).toLocaleDateString()}</span>
+                             <span className="flex items-center gap-1.5 font-bold uppercase tracking-wider"><Tag size={12} className="text-brand-gold" /> {(order.orderType || '').replace(/_/g, ' ')}</span>
                           </div>
                         </div>
                       </div>
-                      <div className="flex flex-col items-end justify-between gap-4">
-                        <div className="text-right">
-                          <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mb-1">
-                            {order.paymentMode === 'points' ? 'POINTS SPENT' : 'ORDER TOTAL'}
+                      <div className="flex flex-row md:flex-col items-center md:items-end justify-between md:justify-between gap-4 border-t md:border-0 pt-4 md:pt-0">
+                        <div className="text-left md:text-right">
+                          <p className="text-[8px] md:text-[10px] text-gray-400 font-bold uppercase tracking-widest mb-1">
+                            {order.paymentMode === 'points' ? 'POINTS' : 'TOTAL'}
                           </p>
-                          <p className="text-3xl font-display font-bold text-brand-black">
+                          <p className="text-xl md:text-3xl font-display font-bold text-brand-black">
                             {order.paymentMode === 'points' ? `${Math.floor(order.pointsUsed)} Pts` : `₹${order.orderAmount || 0}`}
                           </p>
                         </div>
                         {canCancel && (
                           <button 
                             onClick={() => handleCancelOrder(order.id!)}
-                            className="flex items-center gap-2 px-6 py-3 border border-rose-200 text-rose-500 rounded-xl text-xs font-bold uppercase tracking-widest hover:bg-rose-500 hover:text-white transition-all shadow-sm"
+                            className="flex items-center gap-2 px-5 py-2.5 md:px-6 md:py-3 border border-rose-200 text-rose-500 rounded-xl text-[10px] font-bold uppercase tracking-widest hover:bg-rose-500 hover:text-white transition-all shadow-sm"
                           >
                             <Ban size={14} /> Cancel
                           </button>
@@ -228,45 +227,45 @@ const Dashboard: React.FC<DashboardProps> = ({ user, points, adminOnlyRequest, r
         )}
 
         {activeTab === 'wallet' && (
-          <div className="space-y-12 animate-fade-in max-w-4xl mx-auto">
-             <div className="bg-white p-8 md:p-12 rounded-[2rem] shadow-xl border border-gray-100">
-                <div className="flex flex-col md:flex-row items-center justify-between gap-8 mb-12">
-                   <div className="text-center md:text-left">
-                      <h3 className="text-gray-400 text-xs font-bold uppercase tracking-widest mb-2">Available Points</h3>
+          <div className="space-y-8 md:space-y-12 animate-fade-in max-w-4xl mx-auto">
+             <div className="bg-white p-6 md:p-12 rounded-2xl md:rounded-[2rem] shadow-xl border border-gray-100">
+                <div className="flex flex-col md:flex-row items-center justify-between gap-8 mb-10 md:mb-12">
+                   <div className="text-center md:text-left w-full md:w-auto">
+                      <h3 className="text-gray-400 text-[10px] md:text-xs font-bold uppercase tracking-widest mb-3 md:mb-2">Available Points</h3>
                       <div className="flex items-center justify-center md:justify-start gap-4">
-                        <Coins className="text-brand-gold" size={48} />
-                        <span className="text-6xl font-display font-bold text-brand-black">{Math.floor(profile?.points || 0)}</span>
+                        <Coins className="text-brand-gold w-10 h-10 md:w-[48px] md:h-[48px]" />
+                        <span className="text-5xl md:text-6xl font-display font-bold text-brand-black">{Math.floor(profile?.points || 0)}</span>
                       </div>
                    </div>
-                   <div className="bg-brand-dark p-6 rounded-2xl border-2 border-brand-gold/30 flex flex-col items-center">
+                   <div className="bg-brand-dark p-5 md:p-6 rounded-2xl border-2 border-brand-gold/30 flex flex-col items-center w-full md:w-auto shadow-lg">
                       <div className="flex items-center gap-2 text-brand-gold mb-1">
                         <Users size={20} />
-                        <span className="text-2xl font-bold">{profile?.totalReferrals || 0}</span>
+                        <span className="text-xl md:text-2xl font-bold">{profile?.totalReferrals || 0}</span>
                       </div>
-                      <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">Referrals Joined</p>
+                      <p className="text-[8px] md:text-[10px] text-gray-400 font-bold uppercase tracking-widest">Successful Referrals</p>
                    </div>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
-                  <div className="space-y-6">
-                    <h4 className="text-brand-black font-bold uppercase tracking-widest text-xs border-b border-gray-100 pb-2">Loyalty Rules</h4>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-10 md:gap-12">
+                  <div className="space-y-6 order-2 md:order-1">
+                    <h4 className="text-brand-black font-bold uppercase tracking-widest text-[10px] md:text-xs border-b border-gray-100 pb-2">Loyalty Program</h4>
                     <div className="space-y-4">
-                       <div className="flex items-start gap-4">
+                       <div className="flex items-start gap-4 bg-gray-50 p-4 rounded-xl">
                           <div className="w-8 h-8 rounded-full bg-emerald-500/10 text-emerald-600 flex items-center justify-center shrink-0"><Zap size={16}/></div>
-                          <p className="text-xs text-gray-500">Every cash/UPI order earns you <span className="text-brand-black font-bold">10% Points back</span> after delivery.</p>
+                          <p className="text-[10px] md:text-xs text-gray-500 leading-relaxed">Earn <span className="text-brand-black font-bold">10% Points back</span> on every paid order after delivery.</p>
                        </div>
-                       <div className="flex items-start gap-4">
+                       <div className="flex items-start gap-4 bg-gray-50 p-4 rounded-xl">
                           <div className="w-8 h-8 rounded-full bg-blue-500/10 text-blue-600 flex items-center justify-center shrink-0"><Coins size={16}/></div>
-                          <p className="text-xs text-gray-500">Redeem points easily: <span className="text-brand-black font-bold">1 Point = ₹1 value</span> in your menu orders.</p>
+                          <p className="text-[10px] md:text-xs text-gray-500 leading-relaxed">Redeem: <span className="text-brand-black font-bold">1 Point = ₹1 value</span> directly on menu items.</p>
                        </div>
                     </div>
 
-                    <div className="bg-brand-cream/50 p-6 rounded-2xl border border-brand-gold/10 text-center mt-8">
-                      <p className="text-[10px] font-bold uppercase text-gray-500 mb-4 tracking-widest">Share & Earn Bonus</p>
-                      <div className="bg-white border-2 border-dashed border-brand-gold/30 p-3 rounded-xl font-display font-bold text-xl tracking-widest text-brand-black mb-4">
+                    <div className="bg-brand-cream/50 p-5 md:p-6 rounded-2xl border border-brand-gold/10 text-center mt-8">
+                      <p className="text-[9px] md:text-[10px] font-bold uppercase text-gray-500 mb-4 tracking-widest">Your Referral Link</p>
+                      <div className="bg-white border-2 border-dashed border-brand-gold/30 p-3 rounded-xl font-display font-bold text-lg md:text-xl tracking-widest text-brand-black mb-5 break-all text-center">
                         {profile?.referralCode || '----'}
                       </div>
-                      <div className="flex gap-2">
+                      <div className="flex gap-3">
                         <button onClick={copyReferral} className="flex-1 py-3 bg-brand-dark text-white rounded-lg text-[10px] font-bold uppercase flex items-center justify-center gap-2">
                           {copySuccess ? <CheckCircle2 size={14}/> : <Copy size={14}/>} {copySuccess ? 'Copied' : 'Copy'}
                         </button>
@@ -277,28 +276,28 @@ const Dashboard: React.FC<DashboardProps> = ({ user, points, adminOnlyRequest, r
                     </div>
                   </div>
 
-                  <div className="space-y-6">
-                    <h4 className="text-brand-black font-bold uppercase tracking-widest text-xs border-b border-gray-100 pb-2">Recent Transactions</h4>
-                    <div className="space-y-4 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
+                  <div className="space-y-6 order-1 md:order-2">
+                    <h4 className="text-brand-black font-bold uppercase tracking-widest text-[10px] md:text-xs border-b border-gray-100 pb-2">Recent Activity</h4>
+                    <div className="space-y-3 max-h-[350px] overflow-y-auto pr-2 no-scrollbar">
                        {profile?.pointsHistory && profile.pointsHistory.length > 0 ? (
                          profile.pointsHistory.map((tx, i) => (
-                           <div key={i} className="flex items-center justify-between p-4 bg-gray-50 rounded-xl border border-gray-100 hover:border-brand-gold/20 transition-all">
-                             <div className="flex items-center gap-4">
-                                <div className={`w-10 h-10 rounded-full flex items-center justify-center ${tx.type === 'earned' ? 'bg-emerald-500/10 text-emerald-500' : 'bg-rose-500/10 text-rose-500'}`}>
-                                  {tx.type === 'earned' ? <ArrowUpRight size={18}/> : <ArrowDownLeft size={18}/>}
+                           <div key={i} className="flex items-center justify-between p-3 md:p-4 bg-gray-50 rounded-xl border border-gray-100 hover:border-brand-gold/20 transition-all">
+                             <div className="flex items-center gap-3 md:gap-4">
+                                <div className={`w-8 h-8 md:w-10 md:h-10 rounded-full flex items-center justify-center shrink-0 ${tx.type === 'earned' ? 'bg-emerald-500/10 text-emerald-500' : 'bg-rose-500/10 text-rose-500'}`}>
+                                  {tx.type === 'earned' ? <ArrowUpRight size={14} className="md:w-[18px] md:h-[18px]" /> : <ArrowDownLeft size={14} className="md:w-[18px] md:h-[18px]" />}
                                 </div>
-                                <div>
-                                  <p className="text-[10px] font-bold uppercase text-brand-black tracking-tighter capitalize">{tx.via} {tx.type}</p>
+                                <div className="min-w-0">
+                                  <p className="text-[10px] md:text-[10px] font-bold uppercase text-brand-black tracking-tight truncate capitalize">{tx.via} {tx.type}</p>
                                   <p className="text-[8px] text-gray-400 uppercase font-medium">{new Date(tx.date).toLocaleDateString()}</p>
                                 </div>
                              </div>
-                             <span className={`text-sm font-bold ${tx.type === 'earned' ? 'text-emerald-500' : 'text-rose-500'}`}>
+                             <span className={`text-xs md:text-sm font-bold shrink-0 ${tx.type === 'earned' ? 'text-emerald-500' : 'text-rose-500'}`}>
                                 {tx.type === 'earned' ? '+' : '-'}{Math.floor(tx.amount)}
                              </span>
                            </div>
                          ))
                        ) : (
-                         <div className="text-center py-12 text-gray-400 italic text-xs">No transactions recorded yet. Start ordering to earn points!</div>
+                         <div className="text-center py-10 text-gray-400 italic text-[10px]">No activity yet. Earn points by placing orders!</div>
                        )}
                     </div>
                   </div>
@@ -308,31 +307,31 @@ const Dashboard: React.FC<DashboardProps> = ({ user, points, adminOnlyRequest, r
         )}
 
         {activeTab === 'profile' && (
-           <div className="grid grid-cols-1 md:grid-cols-2 gap-8 animate-fade-in">
-              <div className="bg-white p-8 rounded-3xl shadow-sm border border-gray-100">
-                 <h3 className="text-xl font-serif font-bold text-brand-black mb-6">Loyalty Status</h3>
-                 <div className="bg-brand-dark p-8 rounded-2xl flex items-center justify-between border-2 border-brand-gold shadow-lg">
-                    <div className="w-16 h-16 bg-brand-gold/20 rounded-full flex items-center justify-center text-brand-gold"><Zap size={32} /></div>
+           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-8 animate-fade-in">
+              <div className="bg-white p-6 md:p-8 rounded-2xl md:rounded-3xl shadow-sm border border-gray-100">
+                 <h3 className="text-lg md:text-xl font-serif font-bold text-brand-black mb-6">Loyalty Status</h3>
+                 <div className="bg-brand-dark p-6 md:p-8 rounded-2xl flex items-center justify-between border-2 border-brand-gold shadow-lg">
+                    <div className="w-12 h-12 md:w-16 md:h-16 bg-brand-gold/20 rounded-full flex items-center justify-center text-brand-gold shrink-0"><Zap size={24} className="md:w-[32px] md:h-[32px]" /></div>
                     <div className="text-right">
-                       <p className="text-4xl font-display font-bold text-brand-gold capitalize">{profile?.role || 'Guest'}</p>
-                       <p className="text-gray-400 text-[10px] uppercase tracking-widest">Membership Tier</p>
+                       <p className="text-2xl md:text-4xl font-display font-bold text-brand-gold capitalize">{profile?.role || 'Guest'}</p>
+                       <p className="text-gray-400 text-[8px] md:text-[10px] uppercase tracking-widest">Membership Tier</p>
                     </div>
                  </div>
               </div>
-              <div className="bg-white p-8 rounded-3xl shadow-sm border border-gray-100">
-                 <h3 className="text-xl font-serif font-bold text-brand-black mb-6">Account Details</h3>
-                 <div className="space-y-4">
+              <div className="bg-white p-6 md:p-8 rounded-2xl md:rounded-3xl shadow-sm border border-gray-100">
+                 <h3 className="text-lg md:text-xl font-serif font-bold text-brand-black mb-6">Account Details</h3>
+                 <div className="space-y-5">
                     <div>
-                       <p className="text-[10px] text-gray-400 uppercase tracking-widest font-bold">Name</p>
-                       <p className="font-bold text-brand-black">{profile?.name}</p>
+                       <p className="text-[8px] md:text-[10px] text-gray-400 uppercase tracking-widest font-bold mb-1">Display Name</p>
+                       <p className="font-bold text-brand-black text-base">{profile?.name}</p>
                     </div>
                     <div>
-                       <p className="text-[10px] text-gray-400 uppercase tracking-widest font-bold">Referral Code</p>
-                       <p className="font-bold text-brand-gold font-display tracking-widest">{profile?.referralCode}</p>
+                       <p className="text-[8px] md:text-[10px] text-gray-400 uppercase tracking-widest font-bold mb-1">Referral Code</p>
+                       <p className="font-bold text-brand-gold font-display tracking-widest text-lg">{profile?.referralCode}</p>
                     </div>
                     <div>
-                       <p className="text-[10px] text-gray-400 uppercase tracking-widest font-bold">Member Since</p>
-                       <p className="font-bold text-brand-black">{profile?.createdAt ? new Date(profile.createdAt).toLocaleDateString() : '2024'}</p>
+                       <p className="text-[8px] md:text-[10px] text-gray-400 uppercase tracking-widest font-bold mb-1">Member Since</p>
+                       <p className="font-bold text-brand-black text-sm">{profile?.createdAt ? new Date(profile.createdAt).toLocaleDateString() : '2024'}</p>
                     </div>
                  </div>
               </div>
