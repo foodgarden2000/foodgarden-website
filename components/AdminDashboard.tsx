@@ -21,7 +21,7 @@ import {
   Trash2, Utensils, ShoppingBag, Clock, CheckCircle2, XCircle, LogOut, Truck, Sofa, Coffee, Check, Zap, User, Star, X, Search as SearchIcon, Edit3, Eye, EyeOff, Package, MapPin, Volume2, VolumeX, Smartphone, Tag, Phone, CreditCard, Calendar, ShieldCheck, AlertCircle, PartyPopper, Cake, Users, Gift, ArrowRight, Coins
 } from 'lucide-react';
 import { MenuItem, MenuCategory, Order, OrderStatus, UserProfile, PointTransaction } from '../types';
-import { getOptimizedImageURL, FIRST_ORDER_REWARD_INVITER, FIRST_ORDER_REWARD_REFERRED_USER, POINTS_PER_RUPEE } from '../constants';
+import { getOptimizedImageURL, FIRST_ORDER_REWARD_INVITER, FIRST_ORDER_REWARD_REFERRED_USER, POINTS_PER_RUPEE, POINTS_EARN_RATE } from '../constants';
 import AdminMenu from './AdminMenu'; // Import the new Menu Manager
 
 interface AdminDashboardProps {
@@ -159,8 +159,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
             });
             batch.update(orderRef, { pointsDeducted: true });
           } else if (order.paymentMode !== 'points' && !order.pointsCredited) {
-            // Earn Points (1 INR = 2 Pts)
-            const earnedPoints = order.orderAmount * POINTS_PER_RUPEE;
+            // Earn Points (10% of Order Value)
+            const earnedPoints = Math.floor(order.orderAmount * POINTS_EARN_RATE);
             const earnedTx: PointTransaction = {
               type: 'earned',
               amount: earnedPoints,
@@ -439,7 +439,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
                             {order.paymentMode === 'points' ? 'POINTS SPENT' : 'ORDER VALUE'}
                           </p>
                           <p className="text-3xl font-display font-bold text-brand-gold">
-                            {order.paymentMode === 'points' ? `${order.pointsUsed || 0} Pts` : `₹${order.orderAmount || 0}`}
+                            {order.paymentMode === 'points' ? `${Math.floor(order.pointsUsed || 0)} Pts` : `₹${order.orderAmount || 0}`}
                           </p>
                         </div>
                         <div className="flex flex-wrap justify-center lg:justify-end gap-2">
@@ -503,7 +503,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
                         <td className="px-6 py-4 text-brand-gold font-bold">{user.referralCode}</td>
                         <td className="px-6 py-4">{user.referredBy ? <span className="px-2 py-0.5 bg-brand-gold/10 text-brand-gold border border-brand-gold/20 rounded text-[10px] font-bold">{user.referredBy}</span> : <span className="text-gray-600">—</span>}</td>
                         <td className="px-6 py-4"><span className="flex items-center gap-1.5 text-white font-medium"><Users size={12} className="text-brand-gold" /> {user.totalReferrals || 0}</span></td>
-                        <td className="px-6 py-4 font-bold text-emerald-500">{user.points || 0} Pts</td>
+                        <td className="px-6 py-4 font-bold text-emerald-500">{Math.floor(user.points || 0)} Pts</td>
                         <td className="px-6 py-4"><button onClick={() => openReferralHistory(user)} className="px-4 py-1.5 bg-brand-gold/10 text-brand-gold border border-brand-gold/20 rounded text-[10px] font-bold uppercase tracking-widest">View History</button></td>
                       </tr>
                     ))}
@@ -527,7 +527,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
               <div className="grid grid-cols-2 gap-4 mb-6">
                 <div className="bg-black/40 p-4 rounded-xl border border-white/5">
                   <p className="text-[10px] text-gray-500 uppercase font-bold tracking-widest mb-1">Total Points</p>
-                  <p className="text-2xl font-bold text-brand-gold">{selectedReferralUser.points || 0}</p>
+                  <p className="text-2xl font-bold text-brand-gold">{Math.floor(selectedReferralUser.points || 0)}</p>
                 </div>
                 <div className="bg-black/40 p-4 rounded-xl border border-white/5">
                   <p className="text-[10px] text-gray-500 uppercase font-bold tracking-widest mb-1">Referrals</p>
@@ -550,7 +550,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
                     </div>
                     <div className="text-right">
                       <p className={`font-bold ${reward.type === 'earned' ? 'text-emerald-500' : 'text-rose-500'}`}>
-                        {reward.type === 'earned' ? '+' : '-'}{reward.amount} Pts
+                        {reward.type === 'earned' ? '+' : '-'}{Math.floor(reward.amount)} Pts
                       </p>
                     </div>
                   </div>

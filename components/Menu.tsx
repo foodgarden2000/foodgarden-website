@@ -5,7 +5,7 @@ import { collection, onSnapshot, query, orderBy, addDoc, doc } from "https://www
 import { User } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
 import { Utensils, Loader2, ArrowLeft, X, Minus, Plus, Award, ChevronRight, Truck, Coffee, Sofa, Coins, CreditCard, Search as SearchIcon, Star, Zap, Info } from 'lucide-react';
 import { MenuItem, MenuCategory, Order, OrderType, UserProfile, UserCategory, PaymentMode } from '../types';
-import { getOptimizedImageURL, POINTS_PER_RUPEE } from '../constants';
+import { getOptimizedImageURL, POINTS_PER_RUPEE, POINTS_EARN_RATE } from '../constants';
 
 interface MenuProps {
   whatsappNumber: string;
@@ -87,8 +87,7 @@ const Menu: React.FC<MenuProps> = ({ whatsappNumber, user, currentPoints, onNavi
       return;
     }
 
-    const potentialPoints = mode === 'points' ? 0 : totalAmount * POINTS_PER_RUPEE;
-    // Removed subscriber check logic
+    const potentialPoints = mode === 'points' ? 0 : Math.floor(totalAmount * POINTS_EARN_RATE);
     const userType: UserCategory = 'registered';
 
     const orderData: Order = {
@@ -310,7 +309,7 @@ const Menu: React.FC<MenuProps> = ({ whatsappNumber, user, currentPoints, onNavi
                    </div>
                    <div className="text-right">
                       <span className="text-[10px] text-gray-500 uppercase font-bold tracking-widest block mb-1">Points Value</span>
-                      <span className="text-xl font-display font-bold text-brand-red">{getCleanPrice(selectedOrderItem) * orderFormData.quantity * POINTS_PER_RUPEE} Pts</span>
+                      <span className="text-xl font-display font-bold text-brand-red">{Math.floor(getCleanPrice(selectedOrderItem) * orderFormData.quantity * POINTS_PER_RUPEE)} Pts</span>
                    </div>
                 </div>
 

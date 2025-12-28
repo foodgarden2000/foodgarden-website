@@ -207,7 +207,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, points, adminOnlyRequest, r
                             {order.paymentMode === 'points' ? 'POINTS SPENT' : 'ORDER TOTAL'}
                           </p>
                           <p className="text-3xl font-display font-bold text-brand-black">
-                            {order.paymentMode === 'points' ? `${order.pointsUsed} Pts` : `₹${order.orderAmount || 0}`}
+                            {order.paymentMode === 'points' ? `${Math.floor(order.pointsUsed)} Pts` : `₹${order.orderAmount || 0}`}
                           </p>
                         </div>
                         {canCancel && (
@@ -235,7 +235,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, points, adminOnlyRequest, r
                       <h3 className="text-gray-400 text-xs font-bold uppercase tracking-widest mb-2">Available Points</h3>
                       <div className="flex items-center justify-center md:justify-start gap-4">
                         <Coins className="text-brand-gold" size={48} />
-                        <span className="text-6xl font-display font-bold text-brand-black">{profile?.points || 0}</span>
+                        <span className="text-6xl font-display font-bold text-brand-black">{Math.floor(profile?.points || 0)}</span>
                       </div>
                    </div>
                    <div className="bg-brand-dark p-6 rounded-2xl border-2 border-brand-gold/30 flex flex-col items-center">
@@ -253,11 +253,11 @@ const Dashboard: React.FC<DashboardProps> = ({ user, points, adminOnlyRequest, r
                     <div className="space-y-4">
                        <div className="flex items-start gap-4">
                           <div className="w-8 h-8 rounded-full bg-emerald-500/10 text-emerald-600 flex items-center justify-center shrink-0"><Zap size={16}/></div>
-                          <p className="text-xs text-gray-500">Every ₹1 spent on cash/UPI orders earns you <span className="text-brand-black font-bold">2 Points</span> after delivery.</p>
+                          <p className="text-xs text-gray-500">Every cash/UPI order earns you <span className="text-brand-black font-bold">10% Points back</span> after delivery.</p>
                        </div>
                        <div className="flex items-start gap-4">
                           <div className="w-8 h-8 rounded-full bg-blue-500/10 text-blue-600 flex items-center justify-center shrink-0"><Coins size={16}/></div>
-                          <p className="text-xs text-gray-500">Redeem <span className="text-brand-black font-bold">2 Points</span> for every ₹1 value in your menu orders.</p>
+                          <p className="text-xs text-gray-500">Redeem points easily: <span className="text-brand-black font-bold">1 Point = ₹1 value</span> in your menu orders.</p>
                        </div>
                     </div>
 
@@ -293,7 +293,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, points, adminOnlyRequest, r
                                 </div>
                              </div>
                              <span className={`text-sm font-bold ${tx.type === 'earned' ? 'text-emerald-500' : 'text-rose-500'}`}>
-                                {tx.type === 'earned' ? '+' : '-'}{tx.amount}
+                                {tx.type === 'earned' ? '+' : '-'}{Math.floor(tx.amount)}
                              </span>
                            </div>
                          ))

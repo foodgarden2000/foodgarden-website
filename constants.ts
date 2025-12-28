@@ -12,7 +12,8 @@ export const RESTAURANT_INFO = {
 };
 
 // Point & Referral Constants
-export const POINTS_PER_RUPEE = 2;
+export const POINTS_PER_RUPEE = 1; // Now 1 Point = ₹1 for redemption
+export const POINTS_EARN_RATE = 0.1; // Earn 10% of order amount
 export const REFERRAL_SIGNUP_REWARD = 50; // Points to inviter on valid signup
 export const FIRST_ORDER_REWARD_REFERRED_USER = 30; // Points to new user on 1st order
 export const FIRST_ORDER_REWARD_INVITER = 30; // Points to inviter on new user's 1st order
