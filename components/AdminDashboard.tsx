@@ -136,12 +136,9 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
       const orderRef = doc(db, "orders", order.id);
       batch.update(orderRef, updateData);
 
-      // Points deduction logic on completion
-      if (newStatus === 'delivered' && order.paymentMode === 'points' && order.pointsUsed > 0 && order.userId) {
-        const userRef = doc(db, "users", order.userId);
-        batch.update(userRef, { points: increment(-order.pointsUsed) });
-        batch.update(orderRef, { pointsDeducted: true });
-      }
+      // Reverted: Point deduction logic is removed from Admin mark-complete 
+      // to restore previous point system behavior where balance management 
+      // is either automatic or handled elsewhere.
 
       await batch.commit();
       alert(`Order status updated to ${newStatus.toUpperCase()}`);

@@ -84,7 +84,9 @@ const Menu: React.FC<MenuProps> = ({ whatsappNumber, user, currentPoints, onNavi
     const rate = userProfile?.role === 'subscriber' ? 0.15 : 0.10;
     const potentialPoints = Math.floor(totalAmount * rate);
     const userType: UserCategory = userProfile?.role === 'subscriber' ? 'subscriber' : 'registered';
-    const requiredRedeemPoints = totalAmount * 2;
+    
+    // Reverted point redemption logic to standard earn-only or simple deduction
+    const requiredRedeemPoints = totalAmount; // Simplified back to 1:1 or previous logic
 
     if (selectedPaymentMode === 'points' && (userProfile?.points || 0) < requiredRedeemPoints) {
       alert(`Insufficient points! You need ${requiredRedeemPoints} but have ${userProfile?.points || 0}.`);
