@@ -75,7 +75,9 @@ export interface UserProfile {
   role: 'registered' | 'subscriber' | 'admin';
   points: number;
   referralCode: string;
-  referredBy: string | null;
+  referredBy: string | null; // Stores referralCode of inviter
+  totalReferrals: number;
+  firstOrderCompleted: boolean;
   createdAt: string;
   subscription?: {
     status: 'active' | 'rejected' | 'pending' | 'expired';
@@ -87,7 +89,14 @@ export interface UserProfile {
   };
 }
 
-// Added missing interfaces to fix errors
+export interface ReferralReward {
+  id?: string;
+  userId: string; // Owner of the code
+  referredUserId: string; // New user who joined
+  pointsEarned: number;
+  type: 'signup' | 'first_order';
+  timestamp: string;
+}
 
 /**
  * Interface for festival special offerings

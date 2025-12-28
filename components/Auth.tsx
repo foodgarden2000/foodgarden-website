@@ -12,10 +12,12 @@ import {
   query,
   where,
   limit,
-  getDocs
+  getDocs,
+  writeBatch,
+  increment
 } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
-import { Mail, Lock, UserPlus, LogIn, Loader2, AlertCircle, User, Phone, ShieldCheck, Gift } from 'lucide-react';
-import { RESTAURANT_INFO } from '../constants';
+import { Mail, Lock, UserPlus, LogIn, Loader2, AlertCircle, User, Phone, ShieldCheck, Gift, Tag } from 'lucide-react';
+import { RESTAURANT_INFO, REFERRAL_SIGNUP_REWARD } from '../constants';
 
 interface AuthProps {
   adminOnly?: boolean;
@@ -46,8 +48,10 @@ const Auth: React.FC<AuthProps> = ({ adminOnly = false, externalReferralCode = n
     }
   }, [adminOnly, referralCodeInUrl]);
 
-  const generateReferralCode = () => {
-    return Math.random().toString(36).substring(2, 8).toUpperCase();
+  const generateReferralCode = (userName: string) => {
+    const cleanName = (userName || 'USER').split(' ')[0].toUpperCase().replace(/[^A-Z]/g, '');
+    const randomSuffix = Math.floor(1000 + Math.random() * 9000);
+    return `${cleanName}-${randomSuffix}`;
   };
 
   const handleAuth = async (e: React.FormEvent) => {
@@ -65,21 +69,64 @@ const Auth: React.FC<AuthProps> = ({ adminOnly = false, externalReferralCode = n
       if (isLogin) {
         await signInWithEmailAndPassword(auth, email, password);
       } else {
+        const batch = writeBatch(db);
+        let inviterUid = null;
+        let inviterRefCode = referralCodeInUrl?.trim().toUpperCase();
+
+        // Validate Referral Code if present
+        if (inviterRefCode) {
+          const inviterQuery = query(
+            collection(db, "users"),
+            where("referralCode", "==", inviterRefCode),
+            limit(1)
+          );
+          const inviterSnap = await getDocs(inviterQuery);
+          
+          if (!inviterSnap.empty) {
+            const inviterDoc = inviterSnap.docs[0];
+            inviterUid = inviterDoc.id;
+            
+            // Immediate reward for inviter
+            batch.update(doc(db, "users", inviterUid), {
+              points: increment(REFERRAL_SIGNUP_REWARD),
+              totalReferrals: increment(1)
+            });
+
+            // Create reward history
+            const rewardRef = doc(collection(db, "referralRewards"));
+            batch.set(rewardRef, {
+              userId: inviterUid,
+              referredUserId: 'PENDING_REGISTRATION', // Placeholder, updated below if needed or used as linked log
+              pointsEarned: REFERRAL_SIGNUP_REWARD,
+              type: 'signup',
+              timestamp: new Date().toISOString()
+            });
+          } else {
+            // If code is provided but invalid, we continue but don't set referredBy
+            inviterRefCode = null;
+          }
+        }
+
         const userCredential = await createUserWithEmailAndPassword(auth, email, password);
         const newUser = userCredential.user;
         
-        // Reverted: Simple storage of referral information without immediate point logic
-        await setDoc(doc(db, "users", newUser.uid), {
+        const myReferralCode = generateReferralCode(name);
+
+        batch.set(doc(db, "users", newUser.uid), {
           uid: newUser.uid,
           email: newUser.email,
           name: name,
           phone: phone,
           role: "registered",
           points: 0,
-          referralCode: generateReferralCode(),
-          referredBy: referralCodeInUrl || null,
+          referralCode: myReferralCode,
+          referredBy: inviterRefCode || null,
+          totalReferrals: 0,
+          firstOrderCompleted: false,
           createdAt: new Date().toISOString()
         });
+
+        await batch.commit();
       }
     } catch (err: any) {
       setError(err.message || "Authentication failed. Please check your credentials.");
@@ -160,6 +207,16 @@ const Auth: React.FC<AuthProps> = ({ adminOnly = false, externalReferralCode = n
                     value={phone}
                     onChange={(e) => setPhone(e.target.value)}
                     className="w-full bg-black/40 border border-gray-700 rounded-lg py-3 pl-10 pr-4 text-white focus:border-brand-gold focus:outline-none transition-colors placeholder-gray-600 font-sans"
+                  />
+                </div>
+                <div className="relative">
+                  <Tag className="absolute left-3 top-3.5 text-gray-500" size={18} />
+                  <input 
+                    type="text" 
+                    placeholder="Referral Code (Optional)" 
+                    value={referralCodeInUrl || ''}
+                    onChange={(e) => setReferralCodeInUrl(e.target.value.toUpperCase())}
+                    className="w-full bg-black/40 border border-gray-700 rounded-lg py-3 pl-10 pr-4 text-white focus:border-brand-gold focus:outline-none transition-colors placeholder-gray-600 font-sans uppercase"
                   />
                 </div>
               </>

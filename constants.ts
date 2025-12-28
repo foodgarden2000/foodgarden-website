@@ -11,6 +11,11 @@ export const RESTAURANT_INFO = {
   mapLink: "https://www.google.com/maps/search/Chef's+Jalsa+Jhumri+Telaiya"
 };
 
+// Referral Constants
+export const REFERRAL_SIGNUP_REWARD = 50; // Points to inviter on valid signup
+export const FIRST_ORDER_REWARD_REFERRED_USER = 30; // Points to new user on 1st order
+export const FIRST_ORDER_REWARD_INVITER = 30; // Points to inviter on new user's 1st order
+
 /**
  * Converts a Google Drive share link into a direct image URL.
  */
