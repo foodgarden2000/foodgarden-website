@@ -40,7 +40,7 @@ const About: React.FC = () => {
             </h2>
             
             <p className="text-gray-600 leading-relaxed mb-6 font-sans font-light text-lg">
-              Welcome to <span className="font-bold text-brand-dark">Chef’s Jalsa</span>, where passion meets the plate. Located in the heart of Koderma, we bring you a dining experience that blends traditional Indian flavors with modern culinary techniques. 
+              Welcome to <span className="font-bold text-brand-dark">’food garden</span>, where passion meets the plate. Located in the heart of Koderma, we bring you a dining experience that blends traditional Indian flavors with modern culinary techniques. 
             </p>
             <p className="text-gray-600 leading-relaxed mb-10 font-sans font-light text-lg">
               Whether you are craving spicy Chinese starters, a hearty Indian main course, or just want to relax with festive snacks, our menu is designed to "Test Your Taste". We pride ourselves on our warm hospitality, elegant ambiance, and commitment to hygiene.
