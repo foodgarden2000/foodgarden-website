@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { db } from '../firebase';
-import { collection, onSnapshot, query, orderBy, addDoc, doc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+import { collection, onSnapshot, query, addDoc, doc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 import { User } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
 import { Utensils, Loader2, ArrowLeft, X, Minus, Plus, Award, ChevronRight, Truck, Coffee, Sofa, Coins, CreditCard, Search as SearchIcon, Star, Zap, Info } from 'lucide-react';
 import { MenuItem, MenuCategory, Order, OrderType, UserProfile, UserCategory, PaymentMode } from '../types';
@@ -36,12 +36,19 @@ const Menu: React.FC<MenuProps> = ({ whatsappNumber, user, currentPoints, onNavi
   });
 
   useEffect(() => {
-    const unsubCats = onSnapshot(query(collection(db, "menuCategories"), orderBy("categoryName")), (snap) => {
-      setCategories(snap.docs.map(d => ({ ...d.data(), id: d.id } as MenuCategory)));
+    // Remove orderBy to prevent missing index errors
+    const unsubCats = onSnapshot(query(collection(db, "menuCategories")), (snap) => {
+      const fetchedCats = snap.docs.map(d => ({ ...d.data(), id: d.id } as MenuCategory));
+      // Sort alphabetically in memory
+      fetchedCats.sort((a, b) => a.categoryName.localeCompare(b.categoryName));
+      setCategories(fetchedCats);
     });
 
-    const unsubItems = onSnapshot(query(collection(db, "menuItems"), orderBy("itemName")), (snap) => {
-      setItems(snap.docs.map(d => ({ ...d.data(), id: d.id } as MenuItem)));
+    const unsubItems = onSnapshot(query(collection(db, "menuItems")), (snap) => {
+      const fetchedItems = snap.docs.map(d => ({ ...d.data(), id: d.id } as MenuItem));
+      // Sort alphabetically in memory
+      fetchedItems.sort((a, b) => a.itemName.localeCompare(b.itemName));
+      setItems(fetchedItems);
       setLoading(false);
     });
 

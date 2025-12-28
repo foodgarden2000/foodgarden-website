@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { db } from '../firebase';
-import { collection, onSnapshot, query, orderBy, where } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+import { collection, onSnapshot, query, where } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 import { Calendar, PartyPopper, X, User, Phone, Loader2, Tag } from 'lucide-react';
 import { FestivalSpecial } from '../types';
 import { getOptimizedImageURL } from '../constants';
@@ -20,15 +20,24 @@ const FestiveSpecials: React.FC<FestiveSpecialsProps> = ({ whatsappNumber }) => 
   });
 
   useEffect(() => {
-    // Only fetch available festivals for the public view
+    // Only fetch available festivals. 
+    // We remove orderBy to ensure the query works immediately without manual index configuration.
     const q = query(
       collection(db, "festivals"), 
-      where("available", "==", true),
-      orderBy("createdAt", "desc")
+      where("available", "==", true)
     );
     
     const unsubscribe = onSnapshot(q, (snapshot) => {
-      setSpecials(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as FestivalSpecial)));
+      const fetchedSpecials = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as FestivalSpecial));
+      
+      // Sort in memory instead of Firestore query to avoid index dependency
+      fetchedSpecials.sort((a, b) => {
+        const dateA = a.createdAt?.toDate ? a.createdAt.toDate().getTime() : new Date(a.createdAt || 0).getTime();
+        const dateB = b.createdAt?.toDate ? b.createdAt.toDate().getTime() : new Date(b.createdAt || 0).getTime();
+        return dateB - dateA;
+      });
+
+      setSpecials(fetchedSpecials);
       setLoading(false);
     }, (error) => {
       console.error("Error fetching festivals:", error);
@@ -120,7 +129,7 @@ const FestiveSpecials: React.FC<FestiveSpecialsProps> = ({ whatsappNumber }) => 
                 </div>
               </div>
             ))}
-            {specials.length === 0 && (
+            {specials.length === 0 && !loading && (
               <div className="col-span-full text-center py-20 border-2 border-dashed border-gray-800 rounded-2xl">
                 <p className="text-gray-400 font-serif italic">Seasonal events are being planned... Stay tuned!</p>
               </div>

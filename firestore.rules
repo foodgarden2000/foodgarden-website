@@ -8,34 +8,54 @@ service cloud.firestore {
       return request.auth != null && request.auth.token.email == 'gardenfood588@gmail.com';
     }
 
+    // Public Collections (Read for everyone, Write for Admin)
+    match /festivals/{id} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+    
+    match /menuItems/{id} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+    
+    match /menuCategories/{id} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+    
+    match /settings/{id} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
     // Orders Collection Rules
     match /orders/{orderId} {
-      // Allow users to create orders if they are authenticated
       allow create: if request.auth != null;
-      
-      // Allow users to read their own orders, or admin to read all
       allow read: if isAdmin() || (request.auth != null && resource.data.userId == request.auth.uid);
-      
-      // Allow users to cancel (update status) their own orders if it's pending or accepted
-      // Admin can update any field for any order
       allow update: if isAdmin() || (
         request.auth != null && 
         resource.data.userId == request.auth.uid && 
         (resource.data.status == 'pending' || resource.data.status == 'accepted') &&
         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'rejectReason', 'cancelledBy', 'updatedAt'])
       );
-      
-      // Allow admin to delete archived orders
       allow delete: if isAdmin();
     }
     
-    // Standard rules for other collections
-    match /{document=**} {
-      allow read, write: if isAdmin();
-    }
-    
+    // Users Collection
     match /users/{userId} {
       allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+    
+    // Referral Rewards
+    match /referralRewards/{id} {
+      allow read: if isAdmin() || (request.auth != null && resource.data.userId == request.auth.uid);
+      allow write: if isAdmin();
+    }
+
+    // Default catch-all for any new collections
+    match /{document=**} {
+      allow read, write: if isAdmin();
     }
   }
 }
