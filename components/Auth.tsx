@@ -88,7 +88,15 @@ const Auth: React.FC<AuthProps> = ({ adminOnly = false, externalReferralCode = n
 
     try {
       if (isLogin) {
-        await signInWithEmailAndPassword(auth, email, password);
+        try {
+          await signInWithEmailAndPassword(auth, email, password);
+        } catch (err: any) {
+          // Display specific error for incorrect credentials
+          if (err.code === 'auth/wrong-password' || err.code === 'auth/user-not-found' || err.code === 'auth/invalid-credential') {
+            throw new Error("password or Email Incorrect");
+          }
+          throw err;
+        }
       } else {
         const batch = writeBatch(db);
         let inviterUid = null;
@@ -127,26 +135,34 @@ const Auth: React.FC<AuthProps> = ({ adminOnly = false, externalReferralCode = n
           }
         }
 
-        const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-        const newUser = userCredential.user;
-        
-        const myReferralCode = generateReferralCode(name);
+        try {
+          const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+          const newUser = userCredential.user;
+          
+          const myReferralCode = generateReferralCode(name);
 
-        batch.set(doc(db, "users", newUser.uid), {
-          uid: newUser.uid,
-          email: newUser.email,
-          name: name,
-          phone: phone,
-          role: "registered",
-          points: 0,
-          referralCode: myReferralCode,
-          referredBy: inviterRefCode || null,
-          totalReferrals: 0,
-          firstOrderCompleted: false,
-          createdAt: new Date().toISOString()
-        });
+          batch.set(doc(db, "users", newUser.uid), {
+            uid: newUser.uid,
+            email: newUser.email,
+            name: name,
+            phone: phone,
+            role: "registered",
+            points: 0,
+            referralCode: myReferralCode,
+            referredBy: inviterRefCode || null,
+            totalReferrals: 0,
+            firstOrderCompleted: false,
+            createdAt: new Date().toISOString()
+          });
 
-        await batch.commit();
+          await batch.commit();
+        } catch (err: any) {
+          // Display specific error for existing user
+          if (err.code === 'auth/email-already-in-use') {
+            throw new Error("user already exists. sign in?");
+          }
+          throw err;
+        }
       }
     } catch (err: any) {
       setError(err.message || "Authentication failed. Please check your credentials.");
@@ -198,7 +214,7 @@ const Auth: React.FC<AuthProps> = ({ adminOnly = false, externalReferralCode = n
           {adminOnly && <p className="text-brand-red text-[10px] uppercase tracking-[0.2em] font-bold text-center mb-8">Restricted Entry Portal</p>}
 
           {error && (
-            <div className="mb-6 p-4 bg-red-500/10 border border-red-500/50 rounded-lg flex items-start gap-3 text-red-400 text-sm">
+            <div className="mb-6 p-4 bg-red-500/10 border border-red-500/50 rounded-lg flex items-start gap-3 text-red-400 text-sm font-bold">
               <AlertCircle size={18} className="shrink-0" />
               <span>{error}</span>
             </div>
