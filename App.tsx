@@ -34,11 +34,11 @@ const App: React.FC = () => {
     address: RESTAURANT_INFO.address,
     facebook: '#',
     instagram: '#',
-    email: 'contact@chefsjalsa.com',
+    email: 'contact@foodgarden.com',
     hours: RESTAURANT_INFO.hours
   });
 
-  const isAdmin = user?.email === 'admin@chefsjalsa.com';
+  const ADMIN_EMAIL = 'admin@foodgarden.com';
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -52,7 +52,7 @@ const App: React.FC = () => {
       setUser(currentUser);
       setAuthLoading(false);
       
-      if (currentUser?.email === 'admin@chefsjalsa.com') {
+      if (currentUser?.email === ADMIN_EMAIL) {
         setCurrentView('admin');
       } else if (!currentUser && currentView === 'admin') {
         setCurrentView('home');
@@ -73,7 +73,7 @@ const App: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    if (!user || isAdmin) return;
+    if (!user || user.email === ADMIN_EMAIL) return;
 
     const unsubscribeProfile = onSnapshot(doc(db, "users", user.uid), async (snap) => {
       if (!snap.exists()) return;
@@ -83,7 +83,7 @@ const App: React.FC = () => {
     });
 
     return () => unsubscribeProfile();
-  }, [user, isAdmin]);
+  }, [user]);
 
   const handleAdminLogout = () => {
     signOut(auth).then(() => {
@@ -103,7 +103,7 @@ const App: React.FC = () => {
     );
   }
 
-  if (isAdmin) {
+  if (user?.email === ADMIN_EMAIL) {
     return <AdminDashboard onClose={handleAdminLogout} />;
   }
 
@@ -149,7 +149,7 @@ const App: React.FC = () => {
             user={user} 
             points={points} 
             onBack={() => navigateTo('home')} 
-            adminMode={isAdmin}
+            adminMode={user?.email === ADMIN_EMAIL}
             adminOnlyRequest={currentView === 'admin'}
             referralCodeFromUrl={capturedReferralCode}
           />

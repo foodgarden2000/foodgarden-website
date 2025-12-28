@@ -50,7 +50,7 @@ const Navbar: React.FC<NavbarProps> = ({ contactInfo, points, user, onNavigate, 
       <nav className={`fixed w-full z-50 transition-all duration-500 ${scrolled || currentView !== 'home' ? 'glass py-3 shadow-xl' : 'bg-transparent py-6'}`}>
         <div className="container mx-auto px-4 md:px-8 flex justify-between items-center">
           <button onClick={() => onNavigate('home')} className="flex flex-col items-center">
-            <h1 className="text-2xl font-display font-bold text-brand-gold tracking-widest">CHEF’S JALSA</h1>
+            <h1 className="text-2xl font-display font-bold text-brand-gold tracking-widest">FOOD GARDEN</h1>
             <div className="h-0.5 w-12 bg-brand-gold"></div>
           </button>
 
@@ -110,8 +110,6 @@ const Navbar: React.FC<NavbarProps> = ({ contactInfo, points, user, onNavigate, 
                   {user ? <LayoutDashboard size={18} /> : <LogIn size={18} />}
                   {user ? "Dashboard" : "Sign In"}
                 </button>
-                
-                {/* Removed Upgrade to Premium button */}
               </div>
 
               {user && (

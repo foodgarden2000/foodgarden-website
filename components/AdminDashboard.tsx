@@ -56,7 +56,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
     hours: RESTAURANT_INFO.hours,
     facebook: '',
     instagram: '',
-    email: ''
+    email: 'contact@foodgarden.com'
   });
   const [isSavingContact, setIsSavingContact] = useState(false);
 
@@ -357,7 +357,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
           <div className="w-12 h-12 bg-brand-gold/10 rounded-xl flex items-center justify-center text-brand-gold border border-brand-gold/20 shadow-lg"><ShoppingBag size={24} /></div>
           <div>
             <h2 className="text-2xl font-display font-bold text-brand-gold tracking-widest uppercase">Admin Hub</h2>
-            <p className="text-[8px] text-gray-500 uppercase tracking-widest font-bold">Chef's Jalsa Control Panel</p>
+            <p className="text-[8px] text-gray-500 uppercase tracking-widest font-bold">Food Garden Control Panel</p>
           </div>
         </div>
         <div className="flex flex-wrap items-center justify-center bg-brand-dark p-1 rounded-lg border border-brand-gold/10">
@@ -575,7 +575,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
                              value={contactData.email || ''} 
                              onChange={e => setContactData({...contactData, email: e.target.value})} 
                              className="w-full bg-black/40 border border-gray-700 rounded-xl p-4 text-white focus:border-brand-gold outline-none font-sans text-sm"
-                             placeholder="contact@chefsjalsa.com"
+                             placeholder="contact@foodgarden.com"
                           />
                        </div>
                     </div>
@@ -613,7 +613,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
                              value={contactData.facebook || ''} 
                              onChange={e => setContactData({...contactData, facebook: e.target.value})} 
                              className="w-full bg-black/40 border border-gray-700 rounded-xl p-4 text-white focus:border-brand-gold outline-none font-sans text-sm"
-                             placeholder="https://facebook.com/chefsjalsa"
+                             placeholder="https://facebook.com/foodgarden"
                           />
                        </div>
                        <div className="space-y-3">
@@ -622,7 +622,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
                              value={contactData.instagram || ''} 
                              onChange={e => setContactData({...contactData, instagram: e.target.value})} 
                              className="w-full bg-black/40 border border-gray-700 rounded-xl p-4 text-white focus:border-brand-gold outline-none font-sans text-sm"
-                             placeholder="https://instagram.com/chefsjalsa"
+                             placeholder="https://instagram.com/foodgarden"
                           />
                        </div>
                     </div>

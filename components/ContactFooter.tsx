@@ -2,7 +2,7 @@
 import React from 'react';
 import { RESTAURANT_INFO } from '../constants';
 import { ContactInfo } from '../types';
-import { MapPin, Phone, Clock, Facebook, Instagram, ChevronRight, Mail, MessageCircle, Lock } from 'lucide-react';
+import { MapPin, Phone, Clock, Facebook, Instagram, ChevronRight, Mail, MessageCircle, Lock, Navigation, ExternalLink } from 'lucide-react';
 
 interface ContactFooterProps {
   contactInfo: ContactInfo;
@@ -10,8 +10,11 @@ interface ContactFooterProps {
 }
 
 const ContactFooter: React.FC<ContactFooterProps> = ({ contactInfo, onAdminLogin }) => {
-  // Construct Dynamic Google Maps URL based on the fetched address
-  const mapUrl = `https://maps.google.com/maps?q=${encodeURIComponent(contactInfo.address)}&t=&z=15&ie=UTF8&iwloc=&output=embed`;
+  // Construct Dynamic Google Maps URL for embed using the business name + address for pinpoint accuracy
+  const mapUrl = `https://maps.google.com/maps?q=${encodeURIComponent(RESTAURANT_INFO.name + " " + contactInfo.address)}&t=&z=16&ie=UTF8&iwloc=&output=embed`;
+  
+  // Directions URL for Live Navigation to ensure "live direction" is shown (calculating route from current location)
+  const directionsUrl = `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(RESTAURANT_INFO.name + ", " + contactInfo.address)}`;
 
   // Helper to ensure phone link only contains digits and +
   const cleanPhoneLink = (phone: string) => `tel:${phone.replace(/[^\d+]/g, '')}`;
@@ -131,30 +134,43 @@ const ContactFooter: React.FC<ContactFooterProps> = ({ contactInfo, onAdminLogin
             </button>
           </div>
 
-          {/* Dynamic Map Embed */}
-          <div className="h-64 lg:h-auto min-h-[250px] w-full bg-gray-900 rounded-sm overflow-hidden shadow-2xl border border-gray-800 relative group">
-            <iframe 
-              key={contactInfo.address}
-              src={mapUrl}
-              width="100%" 
-              height="100%" 
-              style={{ border: 0 }} 
-              allowFullScreen={true} 
-              loading="lazy" 
-              referrerPolicy="no-referrer-when-downgrade"
-              title="Restaurant Location"
-              className="w-full h-full grayscale hover:grayscale-0 transition-all duration-700 opacity-70 hover:opacity-100"
-            ></iframe>
+          {/* Map Embed & Navigation Button */}
+          <div className="lg:col-span-1 space-y-4">
+            <div className="h-64 w-full bg-gray-900 rounded-sm overflow-hidden shadow-2xl border border-gray-800 relative group">
+              <iframe 
+                key={contactInfo.address}
+                src={mapUrl}
+                width="100%" 
+                height="100%" 
+                style={{ border: 0 }} 
+                allowFullScreen={true} 
+                loading="lazy" 
+                referrerPolicy="no-referrer-when-downgrade"
+                title="Chef's Jalsa Location"
+                className="w-full h-full grayscale hover:grayscale-0 transition-all duration-700 opacity-70 hover:opacity-100"
+              ></iframe>
+              
+              {/* Overlay link for View Larger Map specifically as requested */}
+              <a 
+                href={RESTAURANT_INFO.mapLink}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="absolute bottom-2 right-2 bg-brand-black/90 backdrop-blur-md text-brand-gold px-3 py-1.5 rounded text-[10px] font-bold uppercase tracking-widest border border-brand-gold/30 flex items-center gap-2 hover:bg-brand-gold hover:text-brand-black transition-all shadow-xl"
+              >
+                <ExternalLink size={12} /> View Larger Map
+              </a>
+            </div>
             
             <a 
-              href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(contactInfo.address)}`}
-              target="_blank"
+              href={directionsUrl}
+              target="_blank" 
               rel="noopener noreferrer"
-              className="absolute bottom-4 right-4 bg-brand-gold text-brand-black text-xs font-bold uppercase tracking-wider px-4 py-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300 hover:bg-white"
+              className="flex items-center justify-center gap-3 w-full bg-brand-gold text-brand-black py-4 rounded-sm font-bold uppercase tracking-widest text-xs hover:bg-white transition-all shadow-lg transform active:scale-95"
             >
-              Get Directions
+              <Navigation size={16} /> Live Navigation
             </a>
           </div>
+
         </div>
       </div>
 

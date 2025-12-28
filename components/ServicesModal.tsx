@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { X, Phone, Check, Search, MessageCircle } from 'lucide-react';
 import { SERVICES_DATA } from '../constants';
@@ -12,7 +13,6 @@ interface ServicesModalProps {
 const ServicesModal: React.FC<ServicesModalProps> = ({ isOpen, onClose, contactInfo }) => {
   if (!isOpen) return null;
 
-  // Helper to ensure phone link only contains digits and +
   const cleanPhoneLink = (phone: string) => `tel:${phone.replace(/[^\d+]/g, '')}`;
 
   return (
@@ -21,7 +21,7 @@ const ServicesModal: React.FC<ServicesModalProps> = ({ isOpen, onClose, contactI
         
         {/* Header */}
         <div className="p-4 md:p-6 border-b border-gray-100 flex justify-between items-center bg-white sticky top-0 z-10">
-            <h2 className="text-xl md:text-2xl font-bold text-gray-900 font-sans">Chef's Jalsa</h2>
+            <h2 className="text-xl md:text-2xl font-bold text-gray-900 font-sans">Food Garden</h2>
             
             <div className="flex items-center gap-2 md:gap-3">
                 <a 
@@ -100,16 +100,6 @@ const ServicesModal: React.FC<ServicesModalProps> = ({ isOpen, onClose, contactI
 
             {/* Main Content Area */}
             <div className="w-full md:w-2/3 p-6 md:p-8 overflow-y-auto scroll-smooth">
-                 {/* Mobile Search (Visible only on small screens) */}
-                 <div className="relative mb-6 md:hidden">
-                    <input 
-                      type="text" 
-                      placeholder="Search Services" 
-                      className="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-lg text-sm bg-gray-50" 
-                    />
-                    <Search className="absolute left-3 top-3.5 text-blue-500 w-4 h-4" />
-                </div>
-
                  {Object.entries(SERVICES_DATA).map(([category, items]) => (
                     <div 
                       key={category} 

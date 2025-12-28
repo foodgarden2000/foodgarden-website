@@ -2,13 +2,13 @@
 import { MenuItem, FestivalSpecial, Review, GalleryItem } from './types';
 
 export const RESTAURANT_INFO = {
-  name: "Chef’s Jalsa",
+  name: "Food Garden",
   tagline: "Test Your Taste",
   phone: "+91 8809477481",
   address: "Subhash Chowk, Near PWD, Jhumri Telaiya, Koderma, Jharkhand",
   hours: "11:00 AM – 10:00 PM",
   whatsapp: "918809477481",
-  mapLink: "https://maps.app.goo.gl/WySMEmjVF6SFH6gB6"
+  mapLink: "https://maps.app.goo.gl/mLeH112jFadk7B7J8"
 };
 
 // Point & Referral Constants
@@ -90,7 +90,7 @@ export const FESTIVAL_SPECIALS: FestivalSpecial[] = [
 ];
 
 export const REVIEWS: Review[] = [
-  { id: 1, name: "Amit Kumar", rating: 5, comment: "Best family restaurant in Koderma! The Potali Samosa is a must-try." },
-  { id: 2, name: "Sneha Gupta", rating: 5, comment: "Beautiful ambiance and very polite staff. Loved the Valentine's decoration." },
-  { id: 3, name: "Rajeev Verma", rating: 4, comment: "Great place for birthday parties in Jhumri Telaiya. Good food quality." },
+  { id: 1, name: "Amit Kumar", rating: 5, comment: "Best family restaurant in Koderma! Loved the ambiance at Food Garden." },
+  { id: 2, name: "Sneha Gupta", rating: 5, comment: "Beautiful ambiance and very polite staff. Food Garden is the new go-to place." },
+  { id: 3, name: "Rajeev Verma", rating: 4, comment: "Great place for birthday parties in Jhumri Telaiya. High quality food." },
 ];

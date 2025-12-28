@@ -34,7 +34,7 @@ const Auth: React.FC<AuthProps> = ({ adminOnly = false, externalReferralCode = n
   const [error, setError] = useState('');
   const [referralCodeInUrl, setReferralCodeInUrl] = useState<string | null>(externalReferralCode);
 
-  const ADMIN_EMAIL = 'admin@chefsjalsa.com';
+  const ADMIN_EMAIL = 'admin@foodgarden.com';
 
   useEffect(() => {
     if (!referralCodeInUrl) {
@@ -96,13 +96,12 @@ const Auth: React.FC<AuthProps> = ({ adminOnly = false, externalReferralCode = n
             const rewardRef = doc(collection(db, "referralRewards"));
             batch.set(rewardRef, {
               userId: inviterUid,
-              referredUserId: 'PENDING_REGISTRATION', // Placeholder, updated below if needed or used as linked log
+              referredUserId: 'PENDING_REGISTRATION', 
               pointsEarned: REFERRAL_SIGNUP_REWARD,
               type: 'signup',
               timestamp: new Date().toISOString()
             });
           } else {
-            // If code is provided but invalid, we continue but don't set referredBy
             inviterRefCode = null;
           }
         }

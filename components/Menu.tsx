@@ -113,7 +113,7 @@ const Menu: React.FC<MenuProps> = ({ whatsappNumber, user, currentPoints, onNavi
 
     try {
       const docRef = await addDoc(collection(db, "orders"), orderData);
-      const message = `*NEW ORDER (${mode.toUpperCase()}) - Chef's Jalsa*\n` +
+      const message = `*NEW ORDER (${mode.toUpperCase()}) - Food Garden*\n` +
                       `*ID:* ${docRef.id}\n` +
                       `*Item:* ${selectedOrderItem.itemName}\n` +
                       `*Qty:* ${orderFormData.quantity}\n` +
@@ -156,7 +156,7 @@ const Menu: React.FC<MenuProps> = ({ whatsappNumber, user, currentPoints, onNavi
 
         {/* Section Header */}
         <div className="text-center mb-16">
-          <h3 className="text-brand-gold font-sans font-bold uppercase tracking-[0.2em] text-xs mb-3">Chef's Signature Selection</h3>
+          <h3 className="text-brand-gold font-sans font-bold uppercase tracking-[0.2em] text-xs mb-3">Food Garden Signature Selection</h3>
           <h2 className="text-5xl font-serif font-bold text-brand-black">
             {activeCategory ? categories.find(c => c.id === activeCategory)?.categoryName : "Global Culinary Map"}
           </h2>
@@ -189,7 +189,7 @@ const Menu: React.FC<MenuProps> = ({ whatsappNumber, user, currentPoints, onNavi
                   src={getOptimizedImageURL(cat.backgroundImageURL)} 
                   className="absolute inset-0 w-full h-full object-cover transform group-hover:scale-110 transition-transform duration-1000 opacity-60" 
                   alt={cat.categoryName} 
-                  onError={(e) => (e.currentTarget.src = 'https://via.placeholder.com/600x400?text=Chef’s+Jalsa')}
+                  onError={(e) => (e.currentTarget.src = 'https://via.placeholder.com/600x400?text=Food+Garden')}
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-brand-black via-brand-black/20 to-transparent z-10"></div>
                 <div className="absolute inset-0 flex flex-col items-center justify-center z-20 text-center p-8">
@@ -220,7 +220,7 @@ const Menu: React.FC<MenuProps> = ({ whatsappNumber, user, currentPoints, onNavi
                       src={getOptimizedImageURL(item.itemImageURL)} 
                       className="w-full h-full object-cover transform hover:scale-110 transition-transform duration-1000" 
                       alt={item.itemName} 
-                      onError={(e) => (e.currentTarget.src = 'https://via.placeholder.com/400x300?text=Chef’s+Jalsa')}
+                      onError={(e) => (e.currentTarget.src = 'https://via.placeholder.com/400x300?text=Food+Garden')}
                     />
                     <div className="absolute top-4 left-4 flex flex-col gap-2">
                       <span className={`px-4 py-1.5 rounded-full text-[8px] font-bold uppercase tracking-widest shadow-lg ${item.itemType === 'veg' ? 'bg-emerald-500 text-white' : 'bg-rose-500 text-white'}`}>
@@ -243,7 +243,7 @@ const Menu: React.FC<MenuProps> = ({ whatsappNumber, user, currentPoints, onNavi
                       onClick={() => handleOrderClick(item)} 
                       className="w-full py-4 bg-brand-dark text-white rounded-xl font-bold uppercase text-[10px] tracking-widest hover:bg-brand-gold hover:text-brand-black transition-all shadow-xl active:scale-95"
                     >
-                      {user ? 'Add to Jalsa Cart' : 'View Options'}
+                      {user ? 'Add to Garden Cart' : 'View Options'}
                     </button>
                   </div>
                 </div>
@@ -308,7 +308,7 @@ const Menu: React.FC<MenuProps> = ({ whatsappNumber, user, currentPoints, onNavi
                       <span className="text-3xl font-display font-bold text-brand-gold">₹{getCleanPrice(selectedOrderItem) * orderFormData.quantity}</span>
                    </div>
                    <div className="text-right">
-                      <span className="text-[10px] text-gray-500 uppercase font-bold tracking-widest block mb-1">Points Value</span>
+                      <span className="text-[10px] text-gray-400 font-bold uppercase tracking-widest block mb-1">Points Value</span>
                       <span className="text-xl font-display font-bold text-brand-red">{Math.floor(getCleanPrice(selectedOrderItem) * orderFormData.quantity * POINTS_PER_RUPEE)} Pts</span>
                    </div>
                 </div>

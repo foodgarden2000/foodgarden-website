@@ -36,7 +36,7 @@ const FestiveSpecials: React.FC<FestiveSpecialsProps> = ({ whatsappNumber }) => 
 
   const handleConfirmBooking = (e: React.FormEvent) => {
     e.preventDefault();
-    const message = `Hi, I would like to book the *${selectedMenu}* special menu at Chef's Jalsa.\n\n*Name:* ${formData.name}\n*Phone:* ${formData.phone}\n*Date:* ${formData.date}\n*Time:* ${formData.time}`;
+    const message = `Hi, I would like to book the *${selectedMenu}* special menu at Food Garden.\n\n*Name:* ${formData.name}\n*Phone:* ${formData.phone}\n*Date:* ${formData.date}\n*Time:* ${formData.time}`;
     window.open(`https://wa.me/${whatsappNumber}?text=${encodeURIComponent(message)}`, '_blank');
     setIsModalOpen(false);
     setFormData({ name: '', phone: '', date: '', time: '' });

@@ -64,21 +64,19 @@ const BookOnlineModal: React.FC<BookOnlineModalProps> = ({ isOpen, onClose, user
 
     setLoading(true);
     try {
-      // Map event types to OrderType
       let mappedType: OrderType = 'kitty_party';
       if (selectedEventType === 'birthday') mappedType = 'birthday_party';
       if (selectedEventType === 'club') mappedType = 'club_meeting';
 
-      // Unified Order structure for event bookings
       const bookingData: Order = {
         userId: user.uid,
-        userType: 'registered', // Default user type, removed subscriber check
+        userType: 'registered', 
         userName: formData.name,
         userPhone: formData.phone,
         address: `Guests: ${formData.people} | ${formData.date} at ${formData.time}`,
         itemName: `${selectedEventType.toUpperCase()} Event Booking`,
         orderType: mappedType,
-        orderAmount: 0, // Events are quoted later
+        orderAmount: 0, 
         quantity: formData.people,
         status: 'pending',
         paymentMode: 'cash',
@@ -91,11 +89,9 @@ const BookOnlineModal: React.FC<BookOnlineModalProps> = ({ isOpen, onClose, user
         createdAt: new Date().toISOString()
       };
 
-      // Saving to 'orders' collection instead of 'eventBookings' for unified Admin Panel
       const docRef = await addDoc(collection(db, "orders"), bookingData);
-      console.log("New unified order created:", mappedType, docRef.id);
-
-      const msg = `*NEW ${selectedEventType.toUpperCase()} BOOKING - Chef's Jalsa*\n` +
+      
+      const msg = `*NEW ${selectedEventType.toUpperCase()} BOOKING - Food Garden*\n` +
                   `*ID:* ${docRef.id}\n` +
                   `*Name:* ${formData.name}\n` +
                   `*Guests:* ${formData.people}\n` +
@@ -121,6 +117,7 @@ const BookOnlineModal: React.FC<BookOnlineModalProps> = ({ isOpen, onClose, user
           <div className="flex items-center gap-3">
             {step === 'event_form' && (
               <button onClick={() => setStep('selection')} className="text-gray-400 hover:text-white transition-colors">
+                {/* Fixed: changed size(20) to size={20} to fix "Type 'boolean' is not assignable to type 'string | number'" error */}
                 <ArrowLeft size={20} />
               </button>
             )}
@@ -128,7 +125,7 @@ const BookOnlineModal: React.FC<BookOnlineModalProps> = ({ isOpen, onClose, user
               <h3 className="text-xl font-display font-bold text-brand-gold uppercase tracking-widest">
                 {step === 'selection' ? 'Book Online' : `${selectedEventType?.toUpperCase()} BOOKING`}
               </h3>
-              <p className="text-[10px] text-gray-500 uppercase font-bold tracking-widest">Chef's Jalsa Premium Services</p>
+              <p className="text-[10px] text-gray-400 uppercase font-bold tracking-widest">Food Garden Premium Services</p>
             </div>
           </div>
           <button onClick={onClose} className="p-2 text-gray-400 hover:text-white rounded-full transition-colors"><X /></button>

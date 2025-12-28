@@ -40,16 +40,12 @@ const Reservation: React.FC<ReservationProps> = ({ whatsappNumber, user, onNavig
     e.preventDefault();
     
     if (!user) {
-      console.log("User not logged in → redirecting to login");
       alert("Please login or register to place an order.");
       onNavigate();
       return;
     }
 
-    // Removed subscriber check logic
     const userType: UserCategory = 'registered';
-
-    console.log("Submitting Booking | User Type:", userType);
 
     const orderData = {
       userId: user.uid,
@@ -71,7 +67,7 @@ const Reservation: React.FC<ReservationProps> = ({ whatsappNumber, user, onNavig
     try {
       const docRef = await addDoc(collection(db, "orders"), orderData);
       
-      const whatsappMsg = `*NEW BOOKING (${userType.toUpperCase()}) - Chef's Jalsa*\n` +
+      const whatsappMsg = `*NEW BOOKING (${userType.toUpperCase()}) - Food Garden*\n` +
                           `*ID:* ${docRef.id}\n` +
                           `*Type:* ${formData.type.replace('_', ' ').toUpperCase()}\n` +
                           `*For:* ${formData.guests} People\n` +
@@ -98,7 +94,7 @@ const Reservation: React.FC<ReservationProps> = ({ whatsappNumber, user, onNavig
         <div className="w-full lg:w-5/12 text-white">
           <h3 className="text-brand-gold font-sans font-bold uppercase tracking-[0.2em] text-sm mb-4">Live Reservations</h3>
           <h2 className="text-5xl md:text-6xl font-display font-bold mb-6 text-shadow-lg leading-tight">Secure Your <br/> <span className="text-brand-gold italic">Preferred Spot</span></h2>
-          <p className="text-gray-300 font-sans font-light text-lg mb-8 leading-relaxed">Book a normal table or our exclusive premium cabins. Requests are processed in real-time by our staff.</p>
+          <p className="text-gray-300 font-sans font-light text-lg mb-8 leading-relaxed">Book a normal table or our exclusive premium cabins. Requests are processed in real-time by our staff at Food Garden.</p>
           <div className="flex items-center space-x-8 mt-12 border-t border-gray-800 pt-8">
              <div><span className="block text-brand-gold text-lg font-serif">Lunch</span><span className="text-gray-400 text-sm">11 AM - 4 PM</span></div>
              <div><span className="block text-brand-gold text-lg font-serif">Dinner</span><span className="text-gray-400 text-sm">6 PM - 10 PM</span></div>
