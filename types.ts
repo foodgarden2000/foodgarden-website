@@ -1,34 +1,32 @@
 
-
 export interface MenuItem {
-  // Legacy Fields (kept for backward compatibility)
-  name: string;
+  id?: string;
+  itemId?: string;
+  categoryId: string; // Reference to menuCategories.id
+  itemName: string;
+  itemType: 'veg' | 'non-veg' | 'snacks' | 'drinks' | 'dessert';
+  price: string | number;
   description: string;
-  price?: string;
-  category: string;
-  isVegetarian?: boolean;
+  itemImageURL: string; // Google Drive link
+  recommended: boolean;
+  available: boolean;
+  createdAt?: any;
+  updatedAt?: any;
+  
+  // Legacy support for user menu
+  name?: string;
+  category?: string;
   image?: string;
-  categoryBackgroundImage?: string;
-  itemBackgroundImage?: string;
-
-  // New Management Fields
-  itemName?: string;
-  priceNum?: number;
-  categoryType?: string; // e.g., Veg, Non-Veg, Jain, Special
-  backgroundImageUrl?: string; // Google Drive link
-  isAvailable?: boolean;
-  isRecommended?: boolean;
-  isNewItem?: boolean;
-  createdAt?: string;
-  updatedAt?: string;
 }
 
 export interface MenuCategory {
   id?: string;
+  categoryId?: string;
   categoryName: string;
-  categoryImageUrl: string;
-  isActive: boolean;
-  createdAt: string;
+  description: string;
+  backgroundImageURL: string; // Google Drive link
+  isActive?: boolean; // For display toggle
+  createdAt?: any;
 }
 
 export interface CategoryConfig {
@@ -36,7 +34,6 @@ export interface CategoryConfig {
   image: string;
 }
 
-// Added 'ready' to OrderStatus type
 export type OrderStatus = 'pending' | 'accepted' | 'preparing' | 'ready' | 'out_for_delivery' | 'delivered' | 'rejected' | 'cancelled_by_user' | 'cancelled_by_admin';
 export type OrderType = 'delivery' | 'table_booking' | 'cabin_booking' | 'kitty_party' | 'birthday_party' | 'club_meeting';
 export type PaymentMode = 'upi' | 'cash' | 'points';
@@ -70,22 +67,6 @@ export interface Order {
   cancelledBy?: 'user' | 'admin';
 }
 
-export interface EventBooking {
-  id?: string;
-  bookingType: 'kitty' | 'birthday' | 'club';
-  userId: string;
-  userName: string;
-  phone: string;
-  date: string;
-  time: string;
-  peopleCount: number;
-  specialNote: string;
-  status: 'pending' | 'accepted' | 'rejected' | 'cancelled_by_user';
-  adminReason?: string;
-  createdAt: string;
-  updatedAt: string;
-}
-
 export interface UserProfile {
   uid: string;
   name: string;
@@ -106,42 +87,24 @@ export interface UserProfile {
   };
 }
 
-export interface SubscriptionRequest {
-  id?: string;
-  userId: string;
-  userName: string;
-  userEmail: string;
-  phone: string;
-  transactionId: string;
-  planType: 'yearly' | 'lifetime';
-  amountPaid: number;
-  status: 'pending' | 'approved' | 'rejected' | 'expired';
-  adminReason?: string;
-  expiryDate?: string | null;
-  isExpired?: boolean;
-  createdAt: string;
-  updatedAt: string;
-}
+// Added missing interfaces to fix errors
 
-export interface Referral {
-  id?: string;
-  referrerId: string;
-  newUserId: string;
-  referralType: 'register' | 'subscribe';
-  pointsGiven: number;
-  createdAt: string;
-}
-
+/**
+ * Interface for festival special offerings
+ */
 export interface FestivalSpecial {
   title: string;
   subtitle: string;
   description: string;
   items: string[];
   image: string;
-  color?: string;
+  color: string;
   price?: string;
 }
 
+/**
+ * Interface for guest reviews
+ */
 export interface Review {
   id: number;
   name: string;
@@ -149,17 +112,38 @@ export interface Review {
   comment: string;
 }
 
+/**
+ * Interface for gallery items
+ */
 export interface GalleryItem {
   image: string;
-  caption?: string;
+  caption: string;
 }
 
+/**
+ * Interface for restaurant contact information
+ */
 export interface ContactInfo {
   phone: string;
   whatsapp: string;
   address: string;
-  facebook: string;
-  instagram: string;
-  email: string;
-  hours: string;
+  facebook?: string;
+  instagram?: string;
+  email?: string;
+  hours?: string;
+}
+
+/**
+ * Interface for subscription requests
+ */
+export interface SubscriptionRequest {
+  id?: string;
+  userId: string;
+  userName: string;
+  phone: string;
+  planType: 'yearly' | 'lifetime';
+  transactionId: string;
+  status: 'pending' | 'approved' | 'rejected' | 'expired';
+  createdAt: string;
+  updatedAt?: string;
 }

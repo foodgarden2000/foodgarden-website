@@ -109,12 +109,12 @@ const App: React.FC = () => {
             });
 
             // 2. Find and update the active yearly subscription document
+            // Stability fix: Query without orderBy to avoid composite index requirement
             const subQuery = query(
               collection(db, "subscription"),
               where("userId", "==", user.uid),
               where("planType", "==", "yearly"),
               where("status", "==", "approved"),
-              orderBy("createdAt", "desc"),
               limit(1)
             );
             

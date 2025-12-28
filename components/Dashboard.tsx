@@ -59,9 +59,19 @@ const Dashboard: React.FC<DashboardProps> = ({ user, points, adminOnlyRequest, r
       setLoadingProfile(false);
     });
 
-    const qOrders = query(collection(db, "orders"), where("userId", "==", user.uid), orderBy("createdAt", "desc"));
+    // Stability fix: Remove server-side orderBy to avoid composite index requirements
+    const qOrders = query(collection(db, "orders"), where("userId", "==", user.uid));
     const unsubOrders = onSnapshot(qOrders, (snapshot) => {
-      setMyOrders(snapshot.docs.map(doc => ({ ...sanitizeData(doc.data()), id: doc.id } as Order)));
+      const fetchedOrders = snapshot.docs.map(doc => ({ ...sanitizeData(doc.data()), id: doc.id } as Order));
+      
+      // Sort client-side by createdAt descending
+      fetchedOrders.sort((a, b) => {
+        const dateA = new Date(a.createdAt).getTime();
+        const dateB = new Date(b.createdAt).getTime();
+        return dateB - dateA;
+      });
+      
+      setMyOrders(fetchedOrders);
     });
 
     return () => { unsubProfile(); unsubOrders(); };
