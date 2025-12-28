@@ -23,7 +23,8 @@ import {
 } from 'lucide-react';
 import { MenuItem, MenuCategory, Order, OrderStatus, UserProfile, PointTransaction, ContactInfo } from '../types';
 import { getOptimizedImageURL, FIRST_ORDER_REWARD_INVITER, FIRST_ORDER_REWARD_REFERRED_USER, POINTS_PER_RUPEE, POINTS_EARN_RATE, RESTAURANT_INFO } from '../constants';
-import AdminMenu from './AdminMenu'; // Import the new Menu Manager
+import AdminMenu from './AdminMenu'; 
+import AdminFestivals from './AdminFestivals'; // Import new festivals manager
 
 interface AdminDashboardProps {
   onClose: () => void;
@@ -34,7 +35,7 @@ type UserTypeFilter = 'all' | 'guest' | 'registered';
 type OrderTypeFilter = 'all' | 'food' | 'table' | 'cabin' | 'event';
 
 const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
-  const [activeTab, setActiveTab] = useState<'menu' | 'orders' | 'referrals' | 'contact'>('orders');
+  const [activeTab, setActiveTab] = useState<'menu' | 'orders' | 'referrals' | 'contact' | 'festivals'>('orders');
   
   // Order System States
   const [orderTab, setOrderTab] = useState<OrderTab>('new');
@@ -361,9 +362,12 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
           </div>
         </div>
         <div className="flex flex-wrap items-center justify-center bg-brand-dark p-1 rounded-lg border border-brand-gold/10">
-          {['orders', 'menu', 'referrals', 'contact'].map(tab => (
+          {['orders', 'menu', 'festivals', 'referrals', 'contact'].map(tab => (
             <button key={tab} onClick={() => setActiveTab(tab as any)} className={`flex items-center gap-2 px-6 py-2 rounded-md font-bold text-[10px] uppercase tracking-widest transition-all ${activeTab === tab ? 'bg-brand-gold text-brand-black shadow-lg' : 'text-gray-400'}`}>
-              {tab === 'orders' ? <ShoppingBag size={12} /> : tab === 'menu' ? <Utensils size={12} /> : tab === 'referrals' ? <Gift size={12} /> : <MapPin size={12} />} {tab}
+              {tab === 'orders' ? <ShoppingBag size={12} /> : 
+               tab === 'menu' ? <Utensils size={12} /> : 
+               tab === 'festivals' ? <PartyPopper size={12} /> : 
+               tab === 'referrals' ? <Gift size={12} /> : <MapPin size={12} />} {tab}
             </button>
           ))}
           <button onClick={() => setIsSoundEnabled(!isSoundEnabled)} className={`flex items-center gap-2 px-6 py-2 rounded-md font-bold text-[10px] uppercase ml-2 border ${isSoundEnabled ? 'border-brand-gold text-brand-gold' : 'border-gray-800 text-gray-500'}`}>
@@ -512,6 +516,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
             </div>
           )}
           {activeTab === 'menu' && <div className="animate-fade-in"><AdminMenu /></div>}
+          {activeTab === 'festivals' && <div className="animate-fade-in"><AdminFestivals /></div>}
           {activeTab === 'referrals' && (
             <div className="animate-fade-in space-y-8">
               <div className="bg-brand-dark/40 border border-brand-gold/10 p-6 rounded-3xl shadow-xl">

@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { db } from '../firebase';
-import { collection, onSnapshot, query, orderBy } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+import { collection, onSnapshot, query, orderBy, where } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 import { Calendar, PartyPopper, X, User, Phone, Loader2, Tag } from 'lucide-react';
 import { FestivalSpecial } from '../types';
 import { getOptimizedImageURL } from '../constants';
@@ -20,9 +20,18 @@ const FestiveSpecials: React.FC<FestiveSpecialsProps> = ({ whatsappNumber }) => 
   });
 
   useEffect(() => {
-    const q = query(collection(db, "festivals"), orderBy("title"));
+    // Only fetch available festivals for the public view
+    const q = query(
+      collection(db, "festivals"), 
+      where("available", "==", true),
+      orderBy("createdAt", "desc")
+    );
+    
     const unsubscribe = onSnapshot(q, (snapshot) => {
-      setSpecials(snapshot.docs.map(doc => doc.data() as FestivalSpecial));
+      setSpecials(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as FestivalSpecial)));
+      setLoading(false);
+    }, (error) => {
+      console.error("Error fetching festivals:", error);
       setLoading(false);
     });
 
@@ -72,7 +81,7 @@ const FestiveSpecials: React.FC<FestiveSpecialsProps> = ({ whatsappNumber }) => 
                     className="w-full h-full object-cover transform group-hover:scale-110 transition-transform duration-1000"
                   />
                   <div className="absolute top-4 left-4 z-20 bg-brand-gold/90 backdrop-blur text-brand-black px-4 py-1 rounded-full text-xs font-bold uppercase tracking-widest flex items-center shadow-lg">
-                    <Calendar size={12} className="mr-2" /> Limited
+                    <Calendar size={12} className="mr-2" /> Limited Offer
                   </div>
                 </div>
 
@@ -113,7 +122,7 @@ const FestiveSpecials: React.FC<FestiveSpecialsProps> = ({ whatsappNumber }) => 
             ))}
             {specials.length === 0 && (
               <div className="col-span-full text-center py-20 border-2 border-dashed border-gray-800 rounded-2xl">
-                <p className="text-gray-400 font-serif italic">Seasonal events are being planned... (Admin: Add items to Festivals collection in Firestore)</p>
+                <p className="text-gray-400 font-serif italic">Seasonal events are being planned... Stay tuned!</p>
               </div>
             )}
           </div>

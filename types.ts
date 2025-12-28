@@ -104,6 +104,7 @@ export interface ReferralReward {
  * Interface for festival special offerings
  */
 export interface FestivalSpecial {
+  id?: string;
   title: string;
   subtitle: string;
   description: string;
@@ -111,6 +112,8 @@ export interface FestivalSpecial {
   image: string;
   color: string;
   price?: string;
+  available: boolean;
+  createdAt?: any;
 }
 
 /**

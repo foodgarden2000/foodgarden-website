@@ -69,7 +69,9 @@ export const FESTIVAL_SPECIALS: FestivalSpecial[] = [
     description: "Celebrate the harvest with our grand platter featuring 30 traditional dishes.",
     items: ["Til Kut", "Dahi Chura", "Khichdi Platter", "Special Sweets"],
     image: "https://picsum.photos/600/400?random=10",
-    color: "bg-orange-50"
+    color: "bg-orange-50",
+    // Fix: added missing required 'available' property
+    available: true
   },
   {
     title: "Valentine’s Day",
@@ -77,7 +79,9 @@ export const FESTIVAL_SPECIALS: FestivalSpecial[] = [
     description: "An intimate candle-light dinner experience for couples with live music.",
     items: ["Heart-shaped Cutlets", "Red Velvet Dessert", "Rose Mocktail"],
     image: "https://picsum.photos/600/400?random=11",
-    color: "bg-pink-50"
+    color: "bg-pink-50",
+    // Fix: added missing required 'available' property
+    available: true
   },
   {
     title: "Saraswati Puja & Republic Day",
@@ -85,7 +89,9 @@ export const FESTIVAL_SPECIALS: FestivalSpecial[] = [
     description: "Pure vegetarian feast honoring tradition and patriotism.",
     items: ["Yellow Rice", "Tricolor Salad", "Boondi Ladoo"],
     image: "https://picsum.photos/600/400?random=12",
-    color: "bg-yellow-50"
+    color: "bg-yellow-50",
+    // Fix: added missing required 'available' property
+    available: true
   }
 ];
 
