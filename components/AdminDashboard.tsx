@@ -29,11 +29,11 @@ interface AdminDashboardProps {
 }
 
 type OrderTab = 'new' | 'active' | 'completed' | 'cancelled';
-type UserTypeFilter = 'all' | 'guest' | 'registered' | 'subscriber';
+type UserTypeFilter = 'all' | 'guest' | 'registered'; // Removed 'subscriber'
 type OrderTypeFilter = 'all' | 'food' | 'table' | 'cabin' | 'event';
 
 const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
-  const [activeTab, setActiveTab] = useState<'menu' | 'orders' | 'subscriptions' | 'referrals'>('orders');
+  const [activeTab, setActiveTab] = useState<'menu' | 'orders' | 'referrals'>('orders'); // Removed 'subscriptions'
   
   // Order System States
   const [orderTab, setOrderTab] = useState<OrderTab>('new');
@@ -47,12 +47,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
   const [selectedReferralUser, setSelectedReferralUser] = useState<UserProfile | null>(null);
   const [referralHistory, setReferralHistory] = useState<any[]>([]);
   
-  // Subscription States
-  const [pendingSubs, setPendingSubs] = useState<any[]>([]);
-  const [activeSubs, setActiveSubs] = useState<any[]>([]);
-  const [rejectedSubs, setRejectedSubs] = useState<any[]>([]);
-  const [subTab, setSubTab] = useState<'requests' | 'active' | 'rejected'>('requests');
-  const [processingSubId, setProcessingSubId] = useState<string | null>(null);
+  // Subscription States Removed
 
   const [isSoundEnabled, setIsSoundEnabled] = useState(false);
   const isInitialLoad = useRef(true);
@@ -110,12 +105,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
       setAllUsers(snap.docs.map(d => ({ ...sanitizeData(d.data()), uid: d.id } as UserProfile)));
     });
 
-    const unsubPending = onSnapshot(query(collection(db, "subscription"), where("status", "==", "pending")), (snap) => setPendingSubs(snap.docs.map(d => ({...sanitizeData(d.data()), id: d.id}))));
-    const unsubActive = onSnapshot(query(collection(db, "subscription"), where("isActive", "==", true)), (snap) => setActiveSubs(snap.docs.map(d => ({...sanitizeData(d.data()), id: d.id}))));
-    const unsubRejected = onSnapshot(query(collection(db, "subscription"), where("status", "==", "rejected")), (snap) => setRejectedSubs(snap.docs.map(d => ({...sanitizeData(d.data()), id: d.id}))));
-
     return () => { 
-      unsubOrders(); unsubUsers(); unsubPending(); unsubActive(); unsubRejected();
+      unsubOrders(); unsubUsers();
     };
   }, [isSoundEnabled]);
 
@@ -255,20 +246,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
     try { await deleteDoc(doc(db, col, id)); } catch (err) { alert("Failed."); }
   };
 
-  const handleApproveSubscription = async (sub: any) => {
-    if (!window.confirm(`Approve subscription for ${sub.userName}?`)) return;
-    setProcessingSubId(sub.id);
-    try {
-      const batch = writeBatch(db);
-      const expiryDate = new Date();
-      if (sub.planType === 'yearly') expiryDate.setFullYear(expiryDate.getFullYear() + 1);
-      else expiryDate.setFullYear(expiryDate.getFullYear() + 100);
-      batch.update(doc(db, "subscription", sub.id), { status: 'approved', isActive: true, expiryDate: expiryDate.toISOString(), updatedAt: new Date().toISOString() });
-      batch.update(doc(db, "users", sub.userId), { role: 'subscriber', subscription: { status: 'active', plan: sub.planType, startDate: new Date().toISOString(), expiryDate: expiryDate.toISOString(), transactionId: sub.transactionId } });
-      await batch.commit();
-      alert("Subscription approved!");
-    } catch (err) { alert("Failed to approve."); } finally { setProcessingSubId(null); }
-  };
+  // Removed handleApproveSubscription
 
   const openReferralHistory = async (user: UserProfile) => {
     setSelectedReferralUser(user);
@@ -357,9 +335,9 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
           </div>
         </div>
         <div className="flex flex-wrap items-center justify-center bg-brand-dark p-1 rounded-lg border border-brand-gold/10">
-          {['orders', 'menu', 'referrals', 'subscriptions'].map(tab => (
+          {['orders', 'menu', 'referrals'].map(tab => ( // Removed 'subscriptions'
             <button key={tab} onClick={() => setActiveTab(tab as any)} className={`flex items-center gap-2 px-6 py-2 rounded-md font-bold text-[10px] uppercase tracking-widest transition-all ${activeTab === tab ? 'bg-brand-gold text-brand-black shadow-lg' : 'text-gray-400'}`}>
-              {tab === 'orders' ? <ShoppingBag size={12} /> : tab === 'menu' ? <Utensils size={12} /> : tab === 'referrals' ? <Gift size={12} /> : <Zap size={12} />} {tab}
+              {tab === 'orders' ? <ShoppingBag size={12} /> : tab === 'menu' ? <Utensils size={12} /> : <Gift size={12} />} {tab}
             </button>
           ))}
           <button onClick={() => setIsSoundEnabled(!isSoundEnabled)} className={`flex items-center gap-2 px-6 py-2 rounded-md font-bold text-[10px] uppercase ml-2 border ${isSoundEnabled ? 'border-brand-gold text-brand-gold' : 'border-gray-800 text-gray-500'}`}>
@@ -409,7 +387,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
                       <option value="all">ALL USERS</option>
                       <option value="guest">GUESTS</option>
                       <option value="registered">REGISTERED</option>
-                      <option value="subscriber">PREMIUM</option>
                     </select>
                   </div>
                 </div>
@@ -423,7 +400,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
                     <div key={order.id} className="bg-brand-dark/50 border border-gray-800 rounded-3xl p-6 md:p-8 flex flex-col lg:flex-row justify-between lg:items-center gap-8 group hover:border-brand-gold/30 transition-all shadow-xl">
                       <div className="flex-1">
                         <div className="flex flex-wrap items-center gap-3 mb-4">
-                          <span className={`px-3 py-1 rounded text-[9px] font-bold uppercase tracking-widest ${order.userType === 'subscriber' ? 'bg-brand-red text-white' : 'bg-brand-gold text-brand-black'}`}>
+                          <span className={`px-3 py-1 rounded text-[9px] font-bold uppercase tracking-widest bg-brand-gold text-brand-black`}>
                             {order.userType || 'GUEST'}
                           </span>
                           <span className={`px-3 py-1 rounded border flex items-center gap-1.5 text-[9px] font-bold uppercase tracking-widest ${typeBadge.color}`}>
@@ -535,31 +512,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
               </div>
             </div>
           )}
-          {activeTab === 'subscriptions' && (
-            <div className="animate-fade-in space-y-8">
-              <div className="flex justify-between items-center bg-brand-dark/40 border border-brand-gold/10 p-6 rounded-3xl">
-                <h3 className="text-xl font-display text-white uppercase tracking-widest">Premium Subscriptions</h3>
-                <div className="flex bg-black/40 p-1 rounded-xl">
-                  {['requests', 'active', 'rejected'].map(t => (
-                    <button key={t} onClick={() => setSubTab(t as any)} className={`px-6 py-2 rounded-lg text-[10px] font-bold uppercase tracking-widest transition-all ${subTab === t ? 'bg-brand-gold text-brand-black' : 'text-gray-500 hover:text-white'}`}>{t}</button>
-                  ))}
-                </div>
-              </div>
-              <div className="grid grid-cols-1 gap-6">
-                {(subTab === 'requests' ? pendingSubs : subTab === 'active' ? activeSubs : rejectedSubs).map(sub => (
-                  <div key={sub.id} className="bg-brand-dark/50 border border-gray-800 rounded-3xl p-8 flex justify-between items-center">
-                    <div className="flex gap-6 items-center"><div className="p-4 rounded-2xl bg-brand-gold/10 text-brand-gold border border-brand-gold/20"><ShieldCheck size={30} /></div><div><h4 className="text-white font-bold text-2xl tracking-tight">{sub.userName}</h4><p className="text-gray-500 text-sm">{sub.phone} • {sub.planType.toUpperCase()}</p></div></div>
-                    {subTab === 'requests' && (
-                      <div className="flex gap-2">
-                        <button onClick={() => handleApproveSubscription(sub)} className="px-6 py-3 bg-emerald-500 text-white rounded-xl text-[10px] font-bold uppercase">Approve</button>
-                        <button onClick={() => deleteItem('subscription', sub.id)} className="px-6 py-3 border border-rose-500 text-rose-500 rounded-xl text-[10px] font-bold uppercase">Reject</button>
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
+          {/* Removed activeTab === 'subscriptions' content */}
         </div>
       </div>
 

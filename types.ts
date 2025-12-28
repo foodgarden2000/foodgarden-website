@@ -37,7 +37,7 @@ export interface CategoryConfig {
 export type OrderStatus = 'pending' | 'accepted' | 'preparing' | 'ready' | 'out_for_delivery' | 'delivered' | 'rejected' | 'cancelled_by_user' | 'cancelled_by_admin';
 export type OrderType = 'delivery' | 'table_booking' | 'cabin_booking' | 'kitty_party' | 'birthday_party' | 'club_meeting';
 export type PaymentMode = 'upi' | 'cash' | 'points';
-export type UserCategory = 'normal' | 'registered' | 'subscriber';
+export type UserCategory = 'normal' | 'registered'; // Removed 'subscriber'
 
 export interface Order {
   id?: string;
@@ -80,7 +80,7 @@ export interface UserProfile {
   name: string;
   phone: string;
   email: string;
-  role: 'registered' | 'subscriber' | 'admin';
+  role: 'registered' | 'admin'; // Removed 'subscriber'
   points: number;
   pointsHistory?: PointTransaction[];
   referralCode: string;
@@ -88,14 +88,7 @@ export interface UserProfile {
   totalReferrals: number;
   firstOrderCompleted: boolean;
   createdAt: string;
-  subscription?: {
-    status: 'active' | 'rejected' | 'pending' | 'expired';
-    plan: 'yearly' | 'lifetime';
-    startDate: string;
-    expiryDate?: string;
-    isExpired?: boolean;
-    transactionId?: string;
-  };
+  // Removed subscription property
 }
 
 export interface ReferralReward {
@@ -149,19 +142,4 @@ export interface ContactInfo {
   instagram?: string;
   email?: string;
   hours?: string;
-}
-
-/**
- * Interface for subscription requests
- */
-export interface SubscriptionRequest {
-  id?: string;
-  userId: string;
-  userName: string;
-  phone: string;
-  planType: 'yearly' | 'lifetime';
-  transactionId: string;
-  status: 'pending' | 'approved' | 'rejected' | 'expired';
-  createdAt: string;
-  updatedAt?: string;
 }

@@ -111,14 +111,7 @@ const Navbar: React.FC<NavbarProps> = ({ contactInfo, points, user, onNavigate, 
                   {user ? "Dashboard" : "Sign In"}
                 </button>
                 
-                {user && (
-                   <button 
-                     onClick={() => { onNavigate('dashboard'); setIsOpen(false); }}
-                     className="w-full py-4 border border-brand-red text-brand-red font-bold uppercase tracking-widest text-[10px] rounded-full flex items-center justify-center gap-2"
-                   >
-                     <Zap size={14} /> Upgrade to Premium
-                   </button>
-                )}
+                {/* Removed Upgrade to Premium button */}
               </div>
 
               {user && (

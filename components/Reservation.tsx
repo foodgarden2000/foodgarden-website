@@ -46,8 +46,8 @@ const Reservation: React.FC<ReservationProps> = ({ whatsappNumber, user, onNavig
       return;
     }
 
-    // Identify User Type
-    const userType: UserCategory = userProfile?.role === 'subscriber' ? 'subscriber' : 'registered';
+    // Removed subscriber check logic
+    const userType: UserCategory = 'registered';
 
     console.log("Submitting Booking | User Type:", userType);
 

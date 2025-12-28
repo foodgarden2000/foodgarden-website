@@ -88,7 +88,8 @@ const Menu: React.FC<MenuProps> = ({ whatsappNumber, user, currentPoints, onNavi
     }
 
     const potentialPoints = mode === 'points' ? 0 : totalAmount * POINTS_PER_RUPEE;
-    const userType: UserCategory = userProfile?.role === 'subscriber' ? 'subscriber' : 'registered';
+    // Removed subscriber check logic
+    const userType: UserCategory = 'registered';
 
     const orderData: Order = {
       userId: user.uid,

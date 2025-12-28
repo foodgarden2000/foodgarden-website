@@ -14,7 +14,7 @@ import Dashboard from './components/Dashboard';
 import AdminDashboard from './components/AdminDashboard';
 import BookOnlineModal from './components/BookOnlineModal';
 import { CONTACT_SHEET_URL, RESTAURANT_INFO } from './constants';
-import { ContactInfo, UserProfile, SubscriptionRequest } from './types';
+import { ContactInfo, UserProfile } from './types'; // Removed SubscriptionRequest
 import { auth, db } from './firebase';
 import { onAuthStateChanged, User, signOut } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
 import { doc, onSnapshot, updateDoc, collection, query, where, getDocs, limit, orderBy } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
@@ -76,7 +76,7 @@ const App: React.FC = () => {
     return () => unsubscribeAuth();
   }, []);
 
-  // AUTO EXPIRY SYSTEM FOR YEARLY SUBSCRIPTIONS
+  // Removed Subscription Auto Expiry System
   useEffect(() => {
     if (!user || isAdmin) return;
 
@@ -85,55 +85,6 @@ const App: React.FC = () => {
       
       const profile = snap.data() as UserProfile;
       setPoints(profile.points || 0);
-
-      // Condition: Yearly subscription, not yet marked expired, but expiryDate passed
-      if (
-        profile.role === 'subscriber' && 
-        profile.subscription?.plan === 'yearly' && 
-        profile.subscription?.expiryDate && 
-        !profile.subscription?.isExpired
-      ) {
-        const expiryDate = new Date(profile.subscription.expiryDate);
-        const now = new Date();
-
-        if (expiryDate <= now) {
-          console.log("Yearly subscription expiry checked - Processing Expiry");
-          try {
-            // 1. Update user document - CRITICAL: Set isActive to false to match Admin query
-            await updateDoc(doc(db, "users", user.uid), {
-              role: 'registered',
-              isActive: false, 
-              'subscription.status': 'expired',
-              'subscription.isExpired': true,
-              'subscription.plan': null
-            });
-
-            // 2. Find and update the active yearly subscription document
-            // Stability fix: Query without orderBy to avoid composite index requirement
-            const subQuery = query(
-              collection(db, "subscription"),
-              where("userId", "==", user.uid),
-              where("planType", "==", "yearly"),
-              where("status", "==", "approved"),
-              limit(1)
-            );
-            
-            const subSnap = await getDocs(subQuery);
-            if (!subSnap.empty) {
-              const subId = subSnap.docs[0].id;
-              await updateDoc(doc(db, "subscription", subId), {
-                status: 'expired',
-                isActive: false, 
-                isExpired: true,
-                updatedAt: new Date().toISOString()
-              });
-            }
-            console.log("Subscription expired:", user.uid);
-          } catch (err) {
-            console.error("Error processing auto-expiry:", err);
-          }
-        }
-      }
     });
 
     return () => unsubscribeProfile();

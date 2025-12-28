@@ -72,7 +72,7 @@ const BookOnlineModal: React.FC<BookOnlineModalProps> = ({ isOpen, onClose, user
       // Unified Order structure for event bookings
       const bookingData: Order = {
         userId: user.uid,
-        userType: 'registered', // Default user type
+        userType: 'registered', // Default user type, removed subscriber check
         userName: formData.name,
         userPhone: formData.phone,
         address: `Guests: ${formData.people} | ${formData.date} at ${formData.time}`,

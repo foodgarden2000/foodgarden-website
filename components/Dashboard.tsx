@@ -150,11 +150,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, points, adminOnlyRequest, r
             <div>
               <div className="flex items-center gap-2">
                 <h2 className="text-2xl font-display font-bold text-brand-black">{profile?.name || 'Member'}</h2>
-                {profile?.role === 'subscriber' && (
-                  <span className="bg-brand-red text-white px-3 py-1 rounded text-[8px] font-bold uppercase flex items-center gap-1">
-                    <ShieldCheck size={10} fill="currentColor" /> Premium Subscriber
-                  </span>
-                )}
+                {/* Removed Premium Subscriber badge */}
               </div>
               <p className="text-gray-500 text-xs font-sans">{user.email}</p>
             </div>
