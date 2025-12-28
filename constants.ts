@@ -8,7 +8,7 @@ export const RESTAURANT_INFO = {
   address: "Subhash Chowk, Near PWD, Jhumri Telaiya, Koderma, Jharkhand",
   hours: "11:00 AM – 10:00 PM",
   whatsapp: "918809477481",
-  mapLink: "https://www.google.com/maps/search/Chef's+Jalsa+Jhumri+Telaiya"
+  mapLink: "https://maps.app.goo.gl/WySMEmjVF6SFH6gB6"
 };
 
 // Point & Referral Constants
@@ -33,7 +33,6 @@ export const getOptimizedImageURL = (url: string) => {
   return url;
 };
 
-export const CONTACT_SHEET_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTBunHvnj5tByv_Y0qHHAMfYMST13AX-ZiyuFDCOvVq_Rlu7fvHXwJbET-ATlRDbLuFfdTrA73spf2J/pub?output=csv";
 export const GOOGLE_SHEET_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQ195lwvvNXb9o2tih3WwQ0dcP1TXS32y3Me3LQDk-7n04NudBVr7ntZJ5Qw9uJDQadC_C2dOumd2fw/pub?gid=0&single=true&output=csv";
 export const MENU_SHEET_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQ3MPgLp_uX9GXVawk8dlMzF_oa89ZIqNd3dRVclePFYIfbduVVDsg_lCgcrH22e4LKipMBYEMXGys7/pub?gid=829806034&single=true&output=csv";
 export const GALLERY_SHEET_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTXtsUESvi28kqcXY11bB6H5AMnwvnuDfSwuULkfDHyisVEimTn7Da9jkcUaATfmGUfcpWfjmgp13Bz/pub?gid=0&single=true&output=csv";
@@ -59,7 +58,7 @@ export const MENU_ITEMS: MenuItem[] = [
   { itemName: "Paneer Butter Masala", description: "Cottage cheese cubes in rich tomato and cashew gravy.", categoryId: "Indian", itemType: "veg", price: "220", itemImageURL: "", recommended: false, available: true },
   { itemName: "Dal Tadka", description: "Yellow lentils tempered with ghee, cumin, and garlic.", categoryId: "Indian", itemType: "veg", price: "160", itemImageURL: "", recommended: false, available: true },
   { itemName: "Butter Naan", description: "Soft tandoori bread topped with butter.", categoryId: "Indian", itemType: "veg", price: "45", itemImageURL: "", recommended: false, available: true },
-  { itemName: "Gulab Jamun & Ice-Cream", description: "Hot gulab jamun paired with vanilla ice cream.", categoryId: "Desserts", itemType: "dessert", price: "90", itemImageURL: "", recommended: false, available: true },
+  { itemName: "Gulab Jamun & Ice-Cream", description: "Hot lab jamun paired with vanilla ice cream.", categoryId: "Desserts", itemType: "dessert", price: "90", itemImageURL: "", recommended: false, available: true },
   { itemName: "Sizzling Brownie", description: "Walnut brownie with chocolate sauce on a hot plate.", categoryId: "Desserts", itemType: "dessert", price: "150", itemImageURL: "", recommended: false, available: true },
 ];
 

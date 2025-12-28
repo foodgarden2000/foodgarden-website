@@ -15,13 +15,14 @@ import {
   increment,
   getDocs,
   limit,
-  getDoc
+  getDoc,
+  setDoc
 } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 import { 
-  Trash2, Utensils, ShoppingBag, Clock, CheckCircle2, XCircle, LogOut, Truck, Sofa, Coffee, Check, Zap, User, Star, X, Search as SearchIcon, Edit3, Eye, EyeOff, Package, MapPin, Volume2, VolumeX, Smartphone, Tag, Phone, CreditCard, Calendar, ShieldCheck, AlertCircle, PartyPopper, Cake, Users, Gift, ArrowRight, Coins
+  Trash2, Utensils, ShoppingBag, Clock, CheckCircle2, XCircle, LogOut, Truck, Sofa, Coffee, Check, Zap, User, Star, X, Search as SearchIcon, Edit3, Eye, EyeOff, Package, MapPin, Volume2, VolumeX, Smartphone, Tag, Phone, CreditCard, Calendar, ShieldCheck, AlertCircle, PartyPopper, Cake, Users, Gift, ArrowRight, Coins, Facebook, Instagram, Mail, MessageCircle, Loader2
 } from 'lucide-react';
-import { MenuItem, MenuCategory, Order, OrderStatus, UserProfile, PointTransaction } from '../types';
-import { getOptimizedImageURL, FIRST_ORDER_REWARD_INVITER, FIRST_ORDER_REWARD_REFERRED_USER, POINTS_PER_RUPEE, POINTS_EARN_RATE } from '../constants';
+import { MenuItem, MenuCategory, Order, OrderStatus, UserProfile, PointTransaction, ContactInfo } from '../types';
+import { getOptimizedImageURL, FIRST_ORDER_REWARD_INVITER, FIRST_ORDER_REWARD_REFERRED_USER, POINTS_PER_RUPEE, POINTS_EARN_RATE, RESTAURANT_INFO } from '../constants';
 import AdminMenu from './AdminMenu'; // Import the new Menu Manager
 
 interface AdminDashboardProps {
@@ -29,11 +30,11 @@ interface AdminDashboardProps {
 }
 
 type OrderTab = 'new' | 'active' | 'completed' | 'cancelled';
-type UserTypeFilter = 'all' | 'guest' | 'registered'; // Removed 'subscriber'
+type UserTypeFilter = 'all' | 'guest' | 'registered'; 
 type OrderTypeFilter = 'all' | 'food' | 'table' | 'cabin' | 'event';
 
 const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
-  const [activeTab, setActiveTab] = useState<'menu' | 'orders' | 'referrals'>('orders'); // Removed 'subscriptions'
+  const [activeTab, setActiveTab] = useState<'menu' | 'orders' | 'referrals' | 'contact'>('orders');
   
   // Order System States
   const [orderTab, setOrderTab] = useState<OrderTab>('new');
@@ -47,7 +48,17 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
   const [selectedReferralUser, setSelectedReferralUser] = useState<UserProfile | null>(null);
   const [referralHistory, setReferralHistory] = useState<any[]>([]);
   
-  // Subscription States Removed
+  // Contact Panel States
+  const [contactData, setContactData] = useState<ContactInfo>({
+    phone: RESTAURANT_INFO.phone,
+    whatsapp: RESTAURANT_INFO.whatsapp,
+    address: RESTAURANT_INFO.address,
+    hours: RESTAURANT_INFO.hours,
+    facebook: '',
+    instagram: '',
+    email: ''
+  });
+  const [isSavingContact, setIsSavingContact] = useState(false);
 
   const [isSoundEnabled, setIsSoundEnabled] = useState(false);
   const isInitialLoad = useRef(true);
@@ -105,8 +116,12 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
       setAllUsers(snap.docs.map(d => ({ ...sanitizeData(d.data()), uid: d.id } as UserProfile)));
     });
 
+    const unsubContact = onSnapshot(doc(db, "settings", "contact"), (snap) => {
+      if (snap.exists()) setContactData(snap.data() as ContactInfo);
+    });
+
     return () => { 
-      unsubOrders(); unsubUsers();
+      unsubOrders(); unsubUsers(); unsubContact();
     };
   }, [isSoundEnabled]);
 
@@ -246,7 +261,18 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
     try { await deleteDoc(doc(db, col, id)); } catch (err) { alert("Failed."); }
   };
 
-  // Removed handleApproveSubscription
+  const handleSaveContact = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSavingContact(true);
+    try {
+      await setDoc(doc(db, "settings", "contact"), contactData);
+      alert("Contact information updated successfully!");
+    } catch (err) {
+      alert("Failed to update contact info.");
+    } finally {
+      setIsSavingContact(false);
+    }
+  };
 
   const openReferralHistory = async (user: UserProfile) => {
     setSelectedReferralUser(user);
@@ -335,9 +361,9 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
           </div>
         </div>
         <div className="flex flex-wrap items-center justify-center bg-brand-dark p-1 rounded-lg border border-brand-gold/10">
-          {['orders', 'menu', 'referrals'].map(tab => ( // Removed 'subscriptions'
+          {['orders', 'menu', 'referrals', 'contact'].map(tab => (
             <button key={tab} onClick={() => setActiveTab(tab as any)} className={`flex items-center gap-2 px-6 py-2 rounded-md font-bold text-[10px] uppercase tracking-widest transition-all ${activeTab === tab ? 'bg-brand-gold text-brand-black shadow-lg' : 'text-gray-400'}`}>
-              {tab === 'orders' ? <ShoppingBag size={12} /> : tab === 'menu' ? <Utensils size={12} /> : <Gift size={12} />} {tab}
+              {tab === 'orders' ? <ShoppingBag size={12} /> : tab === 'menu' ? <Utensils size={12} /> : tab === 'referrals' ? <Gift size={12} /> : <MapPin size={12} />} {tab}
             </button>
           ))}
           <button onClick={() => setIsSoundEnabled(!isSoundEnabled)} className={`flex items-center gap-2 px-6 py-2 rounded-md font-bold text-[10px] uppercase ml-2 border ${isSoundEnabled ? 'border-brand-gold text-brand-gold' : 'border-gray-800 text-gray-500'}`}>
@@ -512,7 +538,109 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
               </div>
             </div>
           )}
-          {/* Removed activeTab === 'subscriptions' content */}
+          {activeTab === 'contact' && (
+            <div className="animate-fade-in space-y-8 max-w-4xl mx-auto">
+              <div className="bg-brand-dark/40 border border-brand-gold/10 p-6 rounded-3xl shadow-xl">
+                 <h3 className="text-xl font-display font-bold text-white uppercase tracking-widest">Restaurant Identity & Contact</h3>
+                 <p className="text-[10px] text-gray-500 uppercase tracking-widest mt-1">Control how customers reach and find you</p>
+              </div>
+              
+              <form onSubmit={handleSaveContact} className="bg-brand-dark/50 border border-white/5 rounded-[2rem] p-8 md:p-12 space-y-10 shadow-2xl">
+                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                    <div className="space-y-3">
+                       <label className="flex items-center gap-2 text-[10px] text-gray-500 uppercase font-bold tracking-widest ml-1"><MapPin size={12} className="text-brand-gold" /> Restaurant Address</label>
+                       <textarea 
+                          required 
+                          value={contactData.address} 
+                          onChange={e => setContactData({...contactData, address: e.target.value})} 
+                          className="w-full bg-black/40 border border-gray-700 rounded-2xl p-4 text-white focus:border-brand-gold outline-none h-32 resize-none font-sans text-sm"
+                          placeholder="Full Street Address"
+                       />
+                    </div>
+                    <div className="space-y-8">
+                       <div className="space-y-3">
+                          <label className="flex items-center gap-2 text-[10px] text-gray-500 uppercase font-bold tracking-widest ml-1"><Clock size={12} className="text-brand-gold" /> Opening Hours</label>
+                          <input 
+                             required 
+                             value={contactData.hours || ''} 
+                             onChange={e => setContactData({...contactData, hours: e.target.value})} 
+                             className="w-full bg-black/40 border border-gray-700 rounded-xl p-4 text-white focus:border-brand-gold outline-none font-sans text-sm"
+                             placeholder="e.g. 11:00 AM – 10:00 PM"
+                          />
+                       </div>
+                       <div className="space-y-3">
+                          <label className="flex items-center gap-2 text-[10px] text-gray-500 uppercase font-bold tracking-widest ml-1"><Mail size={12} className="text-brand-gold" /> Business Email</label>
+                          <input 
+                             type="email"
+                             value={contactData.email || ''} 
+                             onChange={e => setContactData({...contactData, email: e.target.value})} 
+                             className="w-full bg-black/40 border border-gray-700 rounded-xl p-4 text-white focus:border-brand-gold outline-none font-sans text-sm"
+                             placeholder="contact@chefsjalsa.com"
+                          />
+                       </div>
+                    </div>
+                 </div>
+
+                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                    <div className="space-y-3">
+                       <label className="flex items-center gap-2 text-[10px] text-gray-500 uppercase font-bold tracking-widest ml-1"><Smartphone size={12} className="text-brand-gold" /> Contact Number (Calling)</label>
+                       <input 
+                          required 
+                          value={contactData.phone} 
+                          onChange={e => setContactData({...contactData, phone: e.target.value})} 
+                          className="w-full bg-black/40 border border-gray-700 rounded-xl p-4 text-white focus:border-brand-gold outline-none font-sans text-sm"
+                          placeholder="+91 88094 77481"
+                       />
+                    </div>
+                    <div className="space-y-3">
+                       <label className="flex items-center gap-2 text-[10px] text-gray-500 uppercase font-bold tracking-widest ml-1"><MessageCircle size={12} className="text-emerald-500" /> WhatsApp Business (Ordering)</label>
+                       <input 
+                          required 
+                          value={contactData.whatsapp} 
+                          onChange={e => setContactData({...contactData, whatsapp: e.target.value})} 
+                          className="w-full bg-black/40 border border-gray-700 rounded-xl p-4 text-white focus:border-brand-gold outline-none font-sans text-sm"
+                          placeholder="918809477481 (Include Country Code, no +)"
+                       />
+                    </div>
+                 </div>
+
+                 <div className="pt-6 border-t border-white/5 space-y-8">
+                    <h4 className="text-[10px] text-gray-600 uppercase font-bold tracking-[0.3em]">Social Media Presence</h4>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                       <div className="space-y-3">
+                          <label className="flex items-center gap-2 text-[10px] text-gray-500 uppercase font-bold tracking-widest ml-1"><Facebook size={12} className="text-blue-500" /> Facebook Page Link</label>
+                          <input 
+                             value={contactData.facebook || ''} 
+                             onChange={e => setContactData({...contactData, facebook: e.target.value})} 
+                             className="w-full bg-black/40 border border-gray-700 rounded-xl p-4 text-white focus:border-brand-gold outline-none font-sans text-sm"
+                             placeholder="https://facebook.com/chefsjalsa"
+                          />
+                       </div>
+                       <div className="space-y-3">
+                          <label className="flex items-center gap-2 text-[10px] text-gray-500 uppercase font-bold tracking-widest ml-1"><Instagram size={12} className="text-pink-500" /> Instagram Profile Link</label>
+                          <input 
+                             value={contactData.instagram || ''} 
+                             onChange={e => setContactData({...contactData, instagram: e.target.value})} 
+                             className="w-full bg-black/40 border border-gray-700 rounded-xl p-4 text-white focus:border-brand-gold outline-none font-sans text-sm"
+                             placeholder="https://instagram.com/chefsjalsa"
+                          />
+                       </div>
+                    </div>
+                 </div>
+
+                 <div className="flex justify-end pt-4">
+                    <button 
+                       type="submit" 
+                       disabled={isSavingContact}
+                       className="px-12 py-5 bg-brand-gold text-brand-black rounded-2xl font-bold uppercase tracking-widest text-xs hover:bg-white transition-all shadow-xl flex items-center gap-3 disabled:opacity-50"
+                    >
+                       {isSavingContact ? <Loader2 size={18} className="animate-spin" /> : <ShieldCheck size={18} />}
+                       Publish Updates
+                    </button>
+                 </div>
+              </form>
+            </div>
+          )}
         </div>
       </div>
 

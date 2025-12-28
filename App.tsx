@@ -13,11 +13,11 @@ import FloatingButtons from './components/FloatingButtons';
 import Dashboard from './components/Dashboard';
 import AdminDashboard from './components/AdminDashboard';
 import BookOnlineModal from './components/BookOnlineModal';
-import { CONTACT_SHEET_URL, RESTAURANT_INFO } from './constants';
-import { ContactInfo, UserProfile } from './types'; // Removed SubscriptionRequest
+import { RESTAURANT_INFO } from './constants';
+import { ContactInfo, UserProfile } from './types'; 
 import { auth, db } from './firebase';
 import { onAuthStateChanged, User, signOut } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
-import { doc, onSnapshot, updateDoc, collection, query, where, getDocs, limit, orderBy } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+import { doc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
 type ViewState = 'home' | 'dashboard' | 'admin';
 
@@ -59,24 +59,19 @@ const App: React.FC = () => {
       }
     });
 
-    const fetchContactInfo = async () => {
-      try {
-        const response = await fetch(CONTACT_SHEET_URL);
-        if (response.ok) {
-          const csvText = await response.text();
-          const parsedData = parseContactCSV(csvText);
-          if (parsedData) setContactInfo(parsedData);
-        }
-      } catch (error) {
-        console.error("Error fetching contact info:", error);
+    // Connect to Firebase for Contact Info
+    const unsubscribeContact = onSnapshot(doc(db, "settings", "contact"), (snap) => {
+      if (snap.exists()) {
+        setContactInfo(snap.data() as ContactInfo);
       }
-    };
+    });
 
-    fetchContactInfo();
-    return () => unsubscribeAuth();
+    return () => {
+      unsubscribeAuth();
+      unsubscribeContact();
+    };
   }, []);
 
-  // Removed Subscription Auto Expiry System
   useEffect(() => {
     if (!user || isAdmin) return;
 
@@ -89,21 +84,6 @@ const App: React.FC = () => {
 
     return () => unsubscribeProfile();
   }, [user, isAdmin]);
-
-  const parseContactCSV = (csvText: string): ContactInfo | null => {
-    const lines = csvText.split(/\r?\n/);
-    if (lines.length < 2) return null;
-    const dataRow = lines[1].split(',');
-    return {
-      phone: dataRow[0] || RESTAURANT_INFO.phone,
-      whatsapp: dataRow[1]?.replace(/\D/g, '') || RESTAURANT_INFO.whatsapp,
-      address: dataRow[2] || RESTAURANT_INFO.address,
-      facebook: dataRow[3] || '#',
-      instagram: dataRow[4] || '#',
-      email: dataRow[5] || 'contact@chefsjalsa.com',
-      hours: dataRow[6] || RESTAURANT_INFO.hours
-    };
-  };
 
   const handleAdminLogout = () => {
     signOut(auth).then(() => {
