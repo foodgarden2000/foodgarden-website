@@ -69,10 +69,19 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
       };
     }
 
-    // Unified Orders Listener
+    // Unified Orders Listener - Simplified for maximum stability
     const unsubOrders = onSnapshot(collection(db, "orders"), (snapshot) => {
-      const loadedOrders = snapshot.docs.map(doc => ({ ...sanitizeData(doc.data()), id: doc.id } as Order & { id: string }));
-      loadedOrders.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+      const loadedOrders = snapshot.docs.map(doc => ({ 
+        ...sanitizeData(doc.data()), 
+        id: doc.id 
+      } as Order & { id: string }));
+      
+      // Sort client-side to ensure it always works without composite index requirements
+      loadedOrders.sort((a, b) => {
+        const timeA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+        const timeB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+        return timeB - timeA;
+      });
 
       if (!isInitialLoad.current && isSoundEnabled) {
         snapshot.docChanges().forEach((change) => {
@@ -87,6 +96,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
       }
       setOrders(loadedOrders);
       isInitialLoad.current = false;
+    }, (error) => {
+      console.error("Firestore Orders Listener Error:", error);
     });
 
     // Subscriptions Listeners
@@ -184,33 +195,46 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
   // Order Filtering Logic
   const filteredOrders = useMemo(() => {
     return orders.filter(o => {
-      const isNew = o.status === 'pending';
-      const isActive = ['accepted', 'preparing', 'ready', 'out_for_delivery'].includes(o.status);
-      const isCompleted = o.status === 'delivered';
-      const isCancelled = ['rejected', 'cancelled_by_user', 'cancelled_by_admin'].includes(o.status);
+      if (!o.status) return false;
+      
+      const s = o.status;
+      const isNew = s === 'pending';
+      const isActive = ['accepted', 'preparing', 'ready', 'out_for_delivery'].includes(s);
+      const isCompleted = s === 'delivered';
+      const isCancelled = ['rejected', 'cancelled_by_user', 'cancelled_by_admin'].includes(s);
 
+      // Tab Filtering
       if (orderTab === 'new' && !isNew) return false;
       if (orderTab === 'active' && !isActive) return false;
       if (orderTab === 'completed' && !isCompleted) return false;
       if (orderTab === 'cancelled' && !isCancelled) return false;
 
+      // Type Filtering
       const t = (o.orderType || '').toLowerCase();
       const mappedType = t.includes('delivery') || t.includes('order') ? 'food' :
                          t.includes('table') ? 'table' :
                          t.includes('cabin') ? 'cabin' : 'event';
       if (typeFilter !== 'all' && mappedType !== typeFilter) return false;
 
+      // User Filter
       if (userFilter !== 'all' && (o.userType || 'guest') !== userFilter) return false;
 
+      // Search
       const search = orderSearch.toLowerCase();
-      return (o.userName || '').toLowerCase().includes(search) || 
-             (o.userPhone || '').includes(search) || 
-             o.id.toLowerCase().includes(search) ||
-             (o.itemName || '').toLowerCase().includes(search);
+      if (search) {
+        const nameMatch = (o.userName || '').toLowerCase().includes(search);
+        const phoneMatch = (o.userPhone || '').includes(search);
+        const idMatch = o.id.toLowerCase().includes(search);
+        const itemMatch = (o.itemName || '').toLowerCase().includes(search);
+        if (!nameMatch && !phoneMatch && !idMatch && !itemMatch) return false;
+      }
+
+      return true;
     });
   }, [orders, orderTab, typeFilter, userFilter, orderSearch]);
 
   const getTimeElapsed = (createdAt: string) => {
+    if (!createdAt) return 'Unknown';
     const diff = Date.now() - new Date(createdAt).getTime();
     const mins = Math.floor(diff / 60000);
     if (mins < 60) return `${mins}m ago`;
@@ -220,7 +244,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
   };
 
   const getOrderTypeBadge = (type: string) => {
-    const t = type.toLowerCase();
+    const t = (type || '').toLowerCase();
     if (t.includes('delivery') || t.includes('order')) return { label: 'FOOD ORDER', color: 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20', icon: Package };
     if (t.includes('table')) return { label: 'TABLE BOOKING', color: 'bg-blue-500/10 text-blue-500 border-blue-500/20', icon: Coffee };
     if (t.includes('cabin')) return { label: 'CABIN BOOKING', color: 'bg-purple-500/10 text-purple-500 border-purple-500/20', icon: Sofa };
@@ -236,6 +260,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
   };
 
   const getStatusLabel = (status: OrderStatus) => {
+    if (!status) return 'UNKNOWN';
     switch(status) {
       case 'pending': return 'PENDING';
       case 'accepted': return 'ACCEPTED';
@@ -331,7 +356,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
 
               {/* Orders List */}
               <div className="grid grid-cols-1 gap-6">
-                {filteredOrders.map((order) => {
+                {filteredOrders.length > 0 ? filteredOrders.map((order) => {
                   const typeBadge = getOrderTypeBadge(order.orderType || '');
                   const isFood = (order.orderType || '').toLowerCase().includes('delivery') || (order.orderType || '').toLowerCase().includes('order');
 
@@ -356,22 +381,22 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
                             {isFood ? <Package className="text-brand-gold" size={24} /> : <Calendar className="text-brand-gold" size={24} />}
                           </div>
                           <div className="flex-1">
-                            <h4 className="text-white font-bold text-xl mb-1">{order.itemName}</h4>
+                            <h4 className="text-white font-bold text-xl mb-1">{order.itemName || 'Untitled Item'}</h4>
                             <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm text-gray-400">
-                              <span className="flex items-center gap-1.5 font-medium"><User size={14} className="text-brand-gold" /> {order.userName}</span>
-                              <span className="flex items-center gap-1.5 font-medium"><Smartphone size={14} className="text-brand-gold" /> {order.userPhone}</span>
+                              <span className="flex items-center gap-1.5 font-medium"><User size={14} className="text-brand-gold" /> {order.userName || 'Guest'}</span>
+                              <span className="flex items-center gap-1.5 font-medium"><Smartphone size={14} className="text-brand-gold" /> {order.userPhone || 'N/A'}</span>
                             </div>
                             
                             <div className="mt-4 p-4 bg-black/20 rounded-2xl border border-white/5">
                               {isFood ? (
                                 <div className="space-y-1">
                                   <p className="text-[10px] text-gray-500 uppercase font-bold tracking-widest">Delivery Address</p>
-                                  <p className="text-xs text-gray-300 italic">{order.address || 'N/A'}</p>
+                                  <p className="text-xs text-gray-300 italic">{order.address || 'No address provided'}</p>
                                 </div>
                               ) : (
                                 <div className="space-y-1">
                                   <p className="text-[10px] text-gray-500 uppercase font-bold tracking-widest">Booking Context</p>
-                                  <p className="text-xs text-gray-300 italic">{order.address}</p>
+                                  <p className="text-xs text-gray-300 italic">{order.address || 'No details'}</p>
                                 </div>
                               )}
                               {order.notes && (
@@ -382,10 +407,10 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
                               )}
                             </div>
 
-                            {order.rejectReason && (
+                            {(order.rejectReason || order.cancelReason) && (
                               <div className="mt-3 bg-rose-500/10 border border-rose-500/20 p-3 rounded-xl">
-                                <p className="text-[10px] text-rose-500 font-bold uppercase tracking-widest mb-1">Status Reason</p>
-                                <p className="text-xs text-rose-400 italic">"{order.rejectReason}"</p>
+                                <p className="text-[10px] text-rose-500 font-bold uppercase tracking-widest mb-1">Reason</p>
+                                <p className="text-xs text-rose-400 italic">"{order.rejectReason || order.cancelReason}"</p>
                               </div>
                             )}
                           </div>
@@ -398,10 +423,10 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
                             {order.paymentMode === 'points' ? 'POINTS TO REDEEM' : 'TOTAL PAYABLE'}
                           </p>
                           <p className="text-3xl font-display font-bold text-brand-gold">
-                            {order.paymentMode === 'points' ? `${order.pointsUsed} Pts` : `₹${order.orderAmount}`}
+                            {order.paymentMode === 'points' ? `${order.pointsUsed || 0} Pts` : `₹${order.orderAmount || 0}`}
                           </p>
                           <div className="flex items-center justify-center lg:justify-end gap-2 mt-1">
-                            <span className="text-[9px] text-gray-500 uppercase font-bold tracking-widest">QTY: {order.quantity} • {order.paymentMode.toUpperCase()}</span>
+                            <span className="text-[9px] text-gray-500 uppercase font-bold tracking-widest">QTY: {order.quantity || 1} • {(order.paymentMode || 'cash').toUpperCase()}</span>
                             {order.pointsUsed > 0 && order.pointsDeducted && <ShieldCheck size={10} className="text-emerald-500" />}
                           </div>
                         </div>
@@ -443,14 +468,19 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
                       </div>
                     </div>
                   );
-                })}
+                }) : (
+                  <div className="py-24 text-center border-2 border-dashed border-gray-800 rounded-3xl">
+                     <Package className="mx-auto text-gray-700 mb-4" size={48} />
+                     <p className="text-gray-500 italic font-serif uppercase tracking-widest text-xs">No {orderTab} orders matching your current filters.</p>
+                  </div>
+                )}
               </div>
             </div>
           )}
 
           {activeTab === 'menu' && (
             <div className="animate-fade-in">
-              <AdminMenu /> {/* Render the new high-end Menu Manager */}
+              <AdminMenu />
             </div>
           )}
 
