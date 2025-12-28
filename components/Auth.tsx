@@ -8,14 +8,11 @@ import {
 import { 
   doc, 
   setDoc,
-  getDocs,
   collection,
   query,
   where,
   limit,
-  updateDoc,
-  increment,
-  addDoc
+  getDocs
 } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 import { Mail, Lock, UserPlus, LogIn, Loader2, AlertCircle, User, Phone, ShieldCheck, Gift } from 'lucide-react';
 import { RESTAURANT_INFO } from '../constants';
@@ -38,7 +35,6 @@ const Auth: React.FC<AuthProps> = ({ adminOnly = false, externalReferralCode = n
   const ADMIN_EMAIL = 'admin@chefsjalsa.com';
 
   useEffect(() => {
-    // If not provided via props, check URL for referral code as fallback
     if (!referralCodeInUrl) {
       const params = new URLSearchParams(window.location.search);
       const ref = params.get('ref');
@@ -46,7 +42,7 @@ const Auth: React.FC<AuthProps> = ({ adminOnly = false, externalReferralCode = n
     }
 
     if (adminOnly) {
-      setIsLogin(true); // Force login mode for staff
+      setIsLogin(true);
     }
   }, [adminOnly, referralCodeInUrl]);
 
@@ -59,7 +55,6 @@ const Auth: React.FC<AuthProps> = ({ adminOnly = false, externalReferralCode = n
     setLoading(true);
     setError('');
 
-    // Extra check for Staff Login
     if (adminOnly && email.toLowerCase() !== ADMIN_EMAIL) {
       setError("Access Denied: This portal is strictly for authorized staff only.");
       setLoading(false);
@@ -73,48 +68,16 @@ const Auth: React.FC<AuthProps> = ({ adminOnly = false, externalReferralCode = n
         const userCredential = await createUserWithEmailAndPassword(auth, email, password);
         const newUser = userCredential.user;
         
-        let referrerUid = null;
-        const myReferralCode = generateReferralCode();
-
-        // Validate Referral
-        if (referralCodeInUrl) {
-          const q = query(collection(db, "users"), where("referralCode", "==", referralCodeInUrl), limit(1));
-          const querySnapshot = await getDocs(q);
-          
-          if (!querySnapshot.empty) {
-            const referrerDoc = querySnapshot.docs[0];
-            
-            // Ensure not referring self
-            if (referrerDoc.id !== newUser.uid) {
-              referrerUid = referrerDoc.id;
-              
-              // 1. Credit Referrer (20 points)
-              await updateDoc(doc(db, "users", referrerUid), {
-                points: increment(20)
-              });
-
-              // 2. Create Referral Record
-              await addDoc(collection(db, "referrals"), {
-                referrerId: referrerUid,
-                newUserId: newUser.uid,
-                referralType: "register",
-                pointsGiven: 20,
-                createdAt: new Date().toISOString()
-              });
-            }
-          }
-        }
-
-        // Create user document in Firestore
+        // Reverted: Simple storage of referral information without immediate point logic
         await setDoc(doc(db, "users", newUser.uid), {
           uid: newUser.uid,
           email: newUser.email,
           name: name,
           phone: phone,
           role: "registered",
-          points: referrerUid ? 20 : 0, // Referee gets 20 points if referred
-          referralCode: myReferralCode,
-          referredBy: referrerUid,
+          points: 0,
+          referralCode: generateReferralCode(),
+          referredBy: referralCodeInUrl || null,
           createdAt: new Date().toISOString()
         });
       }
@@ -146,7 +109,7 @@ const Auth: React.FC<AuthProps> = ({ adminOnly = false, externalReferralCode = n
           {referralCodeInUrl && !isLogin && (
              <div className="mb-6 bg-brand-gold/10 border border-brand-gold/30 p-3 rounded-lg flex items-center gap-3">
                 <Gift className="text-brand-gold" size={20} />
-                <p className="text-brand-gold text-xs font-bold uppercase tracking-widest">Referral Active: You'll earn 20 bonus points!</p>
+                <p className="text-brand-gold text-xs font-bold uppercase tracking-widest">Referral code "{referralCodeInUrl}" applied!</p>
              </div>
           )}
 
