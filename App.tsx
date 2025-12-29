@@ -54,7 +54,8 @@ const App: React.FC = () => {
       
       if (currentUser?.email === ADMIN_EMAIL) {
         setCurrentView('admin');
-      } else if (!currentUser && currentView === 'admin') {
+      } else {
+        // Ensure regular users or freshly logged in users land on the home page first
         setCurrentView('home');
       }
     });
