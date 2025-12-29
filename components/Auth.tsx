@@ -41,7 +41,7 @@ const Auth: React.FC<AuthProps> = ({ adminOnly = false, externalReferralCode = n
   const [referralCodeInUrl, setReferralCodeInUrl] = useState<string | null>(externalReferralCode);
 
   const ADMIN_EMAIL = 'gardenfood588@gmail.com';
-  const GOOGLE_ICON_URL = "https://drive.google.com/file/d/1FvLW6Jkhbe5IBbrr070mEiVNfTKrwrun/view?usp=drive_link";
+  const GOOGLE_ICON_URL = "https://drive.google.com/file/d/1jpvRusqhuBsf08gYo_fh2vYGktUbznfN/view?usp=drive_link";
 
   useEffect(() => {
     if (!referralCodeInUrl) {
