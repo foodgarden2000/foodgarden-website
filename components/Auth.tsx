@@ -99,20 +99,63 @@ const Auth: React.FC<AuthProps> = ({ adminOnly = false, externalReferralCode = n
       const userSnap = await getDoc(userRef);
 
       if (!userSnap.exists()) {
+        const batch = writeBatch(db);
+        let inviterUid = null;
+        let inviterRefCode = referralCodeInUrl?.trim().toUpperCase();
+
+        if (inviterRefCode) {
+          const inviterQuery = query(
+            collection(db, "users"),
+            where("referralCode", "==", inviterRefCode),
+            limit(1)
+          );
+          const inviterSnap = await getDocs(inviterQuery);
+          
+          if (!inviterSnap.empty) {
+            const inviterDoc = inviterSnap.docs[0];
+            inviterUid = inviterDoc.id;
+            batch.update(doc(db, "users", inviterUid), {
+              points: increment(REFERRAL_SIGNUP_REWARD),
+              totalReferrals: increment(1)
+            });
+            const rewardRef = doc(collection(db, "referralRewards"));
+            batch.set(rewardRef, {
+              userId: inviterUid,
+              referredUserId: user.uid, 
+              pointsEarned: REFERRAL_SIGNUP_REWARD,
+              type: 'signup',
+              timestamp: new Date().toISOString()
+            });
+          } else {
+            inviterRefCode = null;
+          }
+        }
+
         const myReferralCode = generateReferralCode(user.displayName || 'GUEST');
-        await setDoc(userRef, {
+        const signupPoints = inviterRefCode ? REFERRAL_SIGNUP_REWARD : 0;
+        const initialHistory = inviterRefCode ? [{
+          type: 'earned',
+          amount: REFERRAL_SIGNUP_REWARD,
+          via: 'signup',
+          date: new Date().toISOString()
+        }] : [];
+
+        batch.set(userRef, {
           uid: user.uid,
           email: user.email,
           name: user.displayName || 'Google Guest',
           phone: user.phoneNumber || '',
           role: "registered",
-          points: 0,
+          points: signupPoints,
+          pointsHistory: initialHistory,
           referralCode: myReferralCode,
-          referredBy: referralCodeInUrl || null,
+          referredBy: inviterRefCode || null,
           totalReferrals: 0,
           firstOrderCompleted: false,
           createdAt: new Date().toISOString()
         });
+        
+        await batch.commit();
       }
     } catch (err: any) {
       setError(err.message || "Google authentication failed.");
@@ -180,6 +223,13 @@ const Auth: React.FC<AuthProps> = ({ adminOnly = false, externalReferralCode = n
           const userCredential = await createUserWithEmailAndPassword(auth, email, password);
           const newUser = userCredential.user;
           const myReferralCode = generateReferralCode(name);
+          const signupPoints = inviterRefCode ? REFERRAL_SIGNUP_REWARD : 0;
+          const initialHistory = inviterRefCode ? [{
+            type: 'earned',
+            amount: REFERRAL_SIGNUP_REWARD,
+            via: 'signup',
+            date: new Date().toISOString()
+          }] : [];
 
           batch.set(doc(db, "users", newUser.uid), {
             uid: newUser.uid,
@@ -187,7 +237,8 @@ const Auth: React.FC<AuthProps> = ({ adminOnly = false, externalReferralCode = n
             name: name,
             phone: phone,
             role: "registered",
-            points: 0,
+            points: signupPoints,
+            pointsHistory: initialHistory,
             referralCode: myReferralCode,
             referredBy: inviterRefCode || null,
             totalReferrals: 0,
