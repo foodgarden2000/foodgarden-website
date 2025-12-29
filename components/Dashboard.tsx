@@ -252,7 +252,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, points, adminOnlyRequest, r
                     <div className="space-y-4">
                        <div className="flex items-start gap-4 bg-gray-50 p-4 rounded-xl">
                           <div className="w-8 h-8 rounded-full bg-emerald-500/10 text-emerald-600 flex items-center justify-center shrink-0"><Zap size={16}/></div>
-                          <p className="text-[10px] md:text-xs text-gray-500 leading-relaxed">Earn <span className="text-brand-black font-bold">10% Points back</span> on every paid order after delivery.</p>
+                          <p className="text-[10px] md:text-xs text-gray-500 leading-relaxed">Earn <span className="text-brand-black font-bold">5% Points back</span> on every paid order after delivery.</p>
                        </div>
                        <div className="flex items-start gap-4 bg-gray-50 p-4 rounded-xl">
                           <div className="w-8 h-8 rounded-full bg-blue-500/10 text-blue-600 flex items-center justify-center shrink-0"><Coins size={16}/></div>

@@ -175,7 +175,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
             });
             batch.update(orderRef, { pointsDeducted: true });
           } else if (order.paymentMode !== 'points' && !order.pointsCredited) {
-            // Earn Points (10% of Order Value)
+            // Earn Points (5% of Order Value)
             const earnedPoints = Math.floor(order.orderAmount * POINTS_EARN_RATE);
             const earnedTx: PointTransaction = {
               type: 'earned',
