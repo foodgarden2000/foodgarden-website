@@ -38,7 +38,7 @@ const App: React.FC = () => {
     hours: RESTAURANT_INFO.hours
   });
 
-  const ADMIN_EMAIL = 'gardenfood588@gmail.com';
+  const ADMIN_EMAIL = 'foodg808@gmail.com';
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
