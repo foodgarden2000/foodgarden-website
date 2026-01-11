@@ -80,7 +80,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
     if (!sounds.current) {
       sounds.current = {
         new: new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3'),
-        cancel: new Audio('https://assets.mixkit.co/active_storage/sfx/2568/2568-preview.mp3')
+        cancel: new Audio('https://assets.mixkit.co/active_storage/sfx/995/995-preview.mp3')
       };
     }
 
