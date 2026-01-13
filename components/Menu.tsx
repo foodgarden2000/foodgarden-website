@@ -334,11 +334,6 @@ const Menu: React.FC<MenuProps> = ({ whatsappNumber, user, currentPoints, onNavi
                   >
                     <Coins size={14} /> Pay Points
                   </button>
-                  {totalAmount < 100 && (
-                     <p className="col-span-2 text-[10px] text-red-400 text-center mt-1">
-                      Minimum order of ₹100 required to use points.
-                     </p>
-                  )}
                 </div>
               </div>
             </div>
