@@ -115,6 +115,10 @@ const App: React.FC = () => {
 
   return (
     <div className="font-sans text-gray-900 bg-brand-cream min-h-screen flex flex-col">
+      <div className="w-full bg-yellow-400 text-black text-center text-[12px] md:text-sm py-2 font-semibold">
+  ⚠️ Prices may include applicable taxes as per government rules.
+</div>
+
       <Navbar 
         contactInfo={contactInfo} 
         points={points} 
