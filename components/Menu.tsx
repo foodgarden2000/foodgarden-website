@@ -325,7 +325,7 @@ const Menu: React.FC<MenuProps> = ({ whatsappNumber, user, currentPoints, onNavi
                     onClick={() => submitOrder('cash')}
                     className="py-3 md:py-4 bg-white text-brand-black font-bold uppercase tracking-widest text-[8px] md:text-[10px] rounded-lg md:rounded-xl flex items-center justify-center gap-2 hover:bg-brand-gold transition-all"
                   >
-                    <CreditCard size={14} /> Pay Money
+                    <CreditCard size={14} /> order
                   </button>
                   <button 
                     disabled={(userProfile?.points || 0) < (getCleanPrice(selectedOrderItem) * orderFormData.quantity * POINTS_PER_RUPEE)}
