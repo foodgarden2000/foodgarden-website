@@ -328,12 +328,17 @@ const Menu: React.FC<MenuProps> = ({ whatsappNumber, user, currentPoints, onNavi
                     <CreditCard size={14} /> order
                   </button>
                   <button 
-                    disabled={(userProfile?.points || 0) < (getCleanPrice(selectedOrderItem) * orderFormData.quantity * POINTS_PER_RUPEE)}
+                   disabled={userProfile?.points < requiredPoints || totalAmount < 100}
                     onClick={() => submitOrder('points')}
                     className="py-3 md:py-4 bg-brand-gold text-brand-black font-bold uppercase tracking-widest text-[8px] md:text-[10px] rounded-lg md:rounded-xl flex items-center justify-center gap-2 disabled:opacity-30 disabled:grayscale hover:bg-white transition-all"
                   >
                     <Coins size={14} /> Pay Points
                   </button>
+                  {totalAmount < 100 && (
+                     <p className="col-span-2 text-[10px] text-red-400 text-center mt-1">
+                      Minimum order of ₹100 required to use points.
+                     </p>
+                  )}
                 </div>
               </div>
             </div>
